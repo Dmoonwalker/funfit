@@ -219,20 +219,192 @@ FunFeetBLE/
 
 ## 📊 Database Schema
 
-### Users Table
-- User authentication and profile data
-- Weight, goals, and preferences
-- Avatar and gender selection
+### 🗄️ **Complete Database Setup**
 
-### Sessions Table
-- Cycling session records
-- Real-time metrics and timestamps
-- Achievement and progress tracking
+The Funfit app uses **Supabase** as the backend database with the following table structure:
 
-### Leaderboard Table
-- Social rankings and competition
-- Automatic updates via database triggers
-- Performance metrics and statistics
+#### **1. Users Table (`public.users`)**
+```sql
+CREATE TABLE public.users (
+    id TEXT PRIMARY KEY,                    -- Matches auth.uid()
+    email TEXT NOT NULL,                    -- User email address
+    username TEXT,                          -- Display name
+    avatar_url TEXT,                        -- Profile picture URL
+    weight_kg DECIMAL(5, 2),               -- User weight in kg
+    daily_goal_calories INTEGER,           -- Daily calorie goal
+    daily_goal_km DECIMAL(5, 2),           -- Daily distance goal in km
+    gender TEXT CHECK (gender IN ('male', 'female', 'other')),
+    avatar_gender TEXT CHECK (avatar_gender IN ('male', 'female')),
+    onboarding_completed BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+```
+
+**Indexes:**
+- `idx_users_email` - Email lookup optimization
+- `idx_users_username` - Username search optimization
+
+**Row Level Security (RLS) Policies:**
+- Users can view/insert/update their own profile
+- Public read access for leaderboard functionality
+
+#### **2. Sessions Table (`public.sessions`)**
+```sql
+CREATE TABLE public.sessions (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    user_id TEXT NOT NULL,                  -- References users.id
+    session_id TEXT NOT NULL,               -- Unique session identifier
+    start_time TIMESTAMP WITH TIME ZONE NOT NULL,
+    end_time TIMESTAMP WITH TIME ZONE,
+    duration BIGINT NOT NULL DEFAULT 0,     -- Duration in milliseconds
+    distance DECIMAL(8, 2) NOT NULL DEFAULT 0,  -- Distance in km
+    speed DECIMAL(5, 2) NOT NULL DEFAULT 0,     -- Average speed km/h
+    calories INTEGER NOT NULL DEFAULT 0,        -- Calories burned
+    cycles INTEGER NOT NULL DEFAULT 0,          -- Total pedal cycles
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+```
+
+**Indexes:**
+- `idx_sessions_user_id` - User session lookup
+- `idx_sessions_session_id` - Session ID lookup
+- `idx_sessions_start_time` - Time-based queries
+
+**Row Level Security (RLS) Policies:**
+- Users can view/insert/update/delete their own sessions
+- Public read access for leaderboard functionality
+
+### 🔧 **Database Setup Instructions**
+
+#### **Step 1: Create Tables**
+Run these SQL scripts in your Supabase SQL Editor in order:
+
+1. **Create Users Table:**
+   ```bash
+   # Run: create_users_table.sql
+   ```
+
+2. **Create Sessions Table:**
+   ```bash
+   # Run: create_sessions_table.sql
+   ```
+
+3. **Add Daily Goal Column:**
+   ```bash
+   # Run: add_daily_goal_km_column.sql
+   ```
+
+4. **Add Leaderboard Policies:**
+   ```bash
+   # Run: add_leaderboard_policy.sql
+   ```
+
+#### **Step 2: Verify Setup**
+Test your database setup with these queries:
+
+```sql
+-- Check table structure
+SELECT column_name, data_type, is_nullable
+FROM information_schema.columns
+WHERE table_name IN ('users', 'sessions') 
+AND table_schema = 'public'
+ORDER BY table_name, ordinal_position;
+
+-- Test leaderboard query
+SELECT 
+    s.user_id,
+    u.username,
+    SUM(s.distance) as total_distance,
+    SUM(s.calories) as total_calories,
+    COUNT(s.id) as total_sessions,
+    MAX(s.speed) as best_speed
+FROM public.sessions s
+LEFT JOIN public.users u ON s.user_id = u.id
+WHERE s.distance > 0 
+GROUP BY s.user_id, u.username
+ORDER BY total_distance DESC 
+LIMIT 5;
+```
+
+### 📈 **Leaderboard Queries**
+
+The app uses these optimized queries for leaderboard functionality:
+
+#### **Top 5 by Total Distance:**
+```sql
+SELECT 
+    user_id,
+    SUM(distance) as total_distance,
+    SUM(calories) as total_calories,
+    COUNT(*) as total_sessions,
+    MAX(speed) as best_speed,
+    ROW_NUMBER() OVER (ORDER BY SUM(distance) DESC) as rank
+FROM public.sessions 
+WHERE distance > 0 
+GROUP BY user_id 
+ORDER BY total_distance DESC 
+LIMIT 5;
+```
+
+#### **Top 5 by Total Calories:**
+```sql
+SELECT 
+    user_id,
+    SUM(distance) as total_distance,
+    SUM(calories) as total_calories,
+    COUNT(*) as total_sessions,
+    MAX(speed) as best_speed,
+    ROW_NUMBER() OVER (ORDER BY SUM(calories) DESC) as rank
+FROM public.sessions 
+WHERE calories > 0 
+GROUP BY user_id 
+ORDER BY total_calories DESC 
+LIMIT 5;
+```
+
+#### **Top 5 by Best Speed:**
+```sql
+SELECT 
+    user_id,
+    SUM(distance) as total_distance,
+    SUM(calories) as total_calories,
+    COUNT(*) as total_sessions,
+    MAX(speed) as best_speed,
+    ROW_NUMBER() OVER (ORDER BY MAX(speed) DESC) as rank
+FROM public.sessions 
+WHERE speed > 0 
+GROUP BY user_id 
+ORDER BY best_speed DESC 
+LIMIT 5;
+```
+
+### 🔐 **Security Features**
+
+#### **Row Level Security (RLS)**
+- **Users Table**: Users can only access their own profile data
+- **Sessions Table**: Users can only access their own cycling sessions
+- **Public Access**: Leaderboard data is publicly readable for social features
+
+#### **Authentication Integration**
+- User IDs match Supabase `auth.uid()` for seamless integration
+- Automatic user creation on first login
+- Guest user support for anonymous usage
+
+### 📊 **Data Flow**
+
+```
+BLE Device → App → Supabase → Real-time Updates
+     ↓           ↓        ↓
+  Raw Data → Processed → Stored → Leaderboard
+```
+
+1. **Data Collection**: BLE device sends real-time cycling data
+2. **Processing**: App processes and validates data
+3. **Storage**: Data is stored in Supabase with user association
+4. **Real-time Updates**: Leaderboard updates automatically
+5. **Social Features**: Users can view rankings and compete
 
 ## 🔧 Configuration
 
@@ -308,6 +480,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 🙏 Acknowledgments
 
+- **Innov8Hub Software Lab** - Development team and project creators
 - **React Native Community** for the excellent framework
 - **Supabase** for backend services
 - **BLE Community** for device integration support
@@ -316,6 +489,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 📞 Support
 
 For support and questions:
+- **Email**: software@innov8hub.ng
 - Create an issue in the repository
 - Check the documentation in the `/docs` folder
 - Review the troubleshooting guide above
@@ -324,10 +498,10 @@ For support and questions:
 
 <div align="center">
 
-**Made with ❤️ for the cycling community**
+**Made with ❤️ by Innov8Hub Software Lab for the cycling community**
 
 [![GitHub](https://img.shields.io/badge/GitHub-Repository-181717?style=flat-square&logo=github)](https://github.com/your-repo)
 [![Issues](https://img.shields.io/badge/Issues-Report%20Bug-red?style=flat-square&logo=github)](https://github.com/your-repo/issues)
-[![Discussions](https://img.shields.io/badge/Discussions-Community-blue?style=flat-square&logo=github)](https://github.com/your-repo/discussions)
+[![Email](https://img.shields.io/badge/Email-software@innov8hub.ng-0078D4?style=flat-square&logo=microsoft-outlook)](mailto:software@innov8hub.ng)
 
 </div>
