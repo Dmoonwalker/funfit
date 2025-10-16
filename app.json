@@ -1,4 +1,36 @@
 {
-  "name": "FunFeetBLE",
-  "displayName": "FunFeetBLE"
+  "name": "Funfit",
+  "displayName": "Funfit",
+  "expo": {
+    "name": "Funfit",
+    "slug": "funfeet-ble",
+    "version": "1.0.0",
+    "orientation": "all",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "white"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.funfeet.ble",
+      "requireFullScreen": false
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/icons/funfeet.png",
+        "backgroundColor": "#FFFFFF"
+      },
+      "package": "com.funfeet.ble",
+      "screenOrientation": "unspecified"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    }
+  }
 }

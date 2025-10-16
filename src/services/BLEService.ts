@@ -29,10 +29,11 @@ const SERVICE_UUID = "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
  * Characteristic UUIDs for different cycling data types
  * Each UUID corresponds to a specific data characteristic on the BLE device
  */
-const CHARACTERISTIC_UUID = "beb5483e-36e1-4688-b7f5-ea07361b26a8";  // Speed data
-const CHARACTERISTIC_UUID1 = "c0d70848-0a28-4b25-9a3e-02b37d2dc5af"; // Distance data
-const CHARACTERISTIC_UUID2 = "a8a43e99-83d2-4f36-8d90-e346f728f4fe"; // Calories data
-const CHARACTERISTIC_UUID3 = "42c092ab-08ab-4bf7-a054-f91298078ac3"; // Additional data
+// Final corrected characteristic mapping based on actual device behavior:
+const CHARACTERISTIC_UUID = "beb5483e-36e1-4688-b7f5-ea07361b26a8";  // Actually RPM (was labeled speed)
+const CHARACTERISTIC_UUID1 = "c0d70848-0a28-4b25-9a3e-02b37d2dc5af"; // Actually Speed km/h (was labeled distance)  
+const CHARACTERISTIC_UUID2 = "a8a43e99-83d2-4f36-8d90-e346f728f4fe"; // Actually Distance km (was labeled calories)
+const CHARACTERISTIC_CYCLES_UUID = "42c092ab-08ab-4bf7-a054-f91298078ac3"; // Actually Cycles count (comes from calories characteristic)
 
 // ============================================================================
 // INTERFACE DEFINITIONS
@@ -77,8 +78,10 @@ export interface CyclingData {
   speed: number;
   /** Total distance traveled in km */
   distance: number;
-  /** Calories burned */
-  calories: number;
+  /** Total cycles completed (from calories characteristic) */
+  cycles: number;
+  /** Cadence in revolutions per minute */
+  rpm?: number;
 }
 
 // ============================================================================
@@ -162,7 +165,8 @@ class BLEService {
   /** Current cycling data values */
   private currentSpeed: number = 0;
   private currentDistance: number = 0;
-  private currentCalories: number = 0;
+  private currentCycles: number = 0;
+  private currentRpm: number = 0;
 
   // ============================================================================
   // CALLBACK PROPERTIES
@@ -194,6 +198,59 @@ class BLEService {
   constructor() {
     this.manager = new BleManager();
     this.setupConnectionStateMonitoring();
+  }
+
+  /**
+   * Recreate BLE manager if it's in a bad state
+   * This can help resolve scanning issues on some devices
+   */
+  private async recreateBLEManager(): Promise<void> {
+    try {
+      console.log('[FUNFEET_BLE] 🔄 Recreating BLE manager...');
+      
+      // Clean up existing manager
+      if (this.connectionStateSubscription) {
+        this.connectionStateSubscription.remove();
+        this.connectionStateSubscription = null;
+      }
+      
+      if (this.deviceConnectionSubscription) {
+        this.deviceConnectionSubscription.remove();
+        this.deviceConnectionSubscription = null;
+      }
+      
+      // Stop any active scanning
+      try {
+        this.manager.stopDeviceScan();
+      } catch (error) {
+        console.log('[FUNFEET_BLE] ⚠️ Error stopping scan during manager recreation:', error);
+      }
+      
+      // Destroy old manager
+      try {
+        this.manager.destroy();
+      } catch (error) {
+        console.log('[FUNFEET_BLE] ⚠️ Error destroying old manager:', error);
+      }
+      
+      // Wait a bit
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Create new manager
+      this.manager = new BleManager();
+      this.isScanning = false;
+      this.devices.clear();
+      this.characteristics.clear();
+      this.characteristicValues.clear();
+      this.connectedDevice = null;
+      
+      // Setup monitoring again
+      this.setupConnectionStateMonitoring();
+      
+      console.log('[FUNFEET_BLE] ✅ BLE manager recreated successfully');
+    } catch (error) {
+      console.error('[FUNFEET_BLE] ❌ Error recreating BLE manager:', error);
+    }
   }
 
   // ============================================================================
@@ -314,7 +371,7 @@ class BLEService {
 
   /**
    * Notifies listeners of connection status changes
-   * 
+   *
    * @param isConnected - Current connection status
    * @param device - Connected device or null if disconnected
    */
@@ -354,24 +411,91 @@ class BLEService {
   async checkPermissions(): Promise<boolean> {
     if (Platform.OS === 'android') {
       try {
-        const granted = await PermissionsAndroid.request(
-          PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
-          {
-            title: 'Location Permission',
-            message: 'This app needs location permission to scan for Bluetooth devices.',
-            buttonNeutral: 'Ask Me Later',
-            buttonNegative: 'Cancel',
-            buttonPositive: 'OK',
-          }
-        );
+        // For Android 12+ (API level 31+), we need to request multiple permissions
+        const apiLevel = Platform.Version;
         
-        if (granted === PermissionsAndroid.RESULTS.GRANTED) {
-          console.log('Location permission granted');
-          return true;
+        if (apiLevel >= 31) {
+          // Android 12+ permissions
+          const bluetoothScanGranted = await PermissionsAndroid.request(
+            'android.permission.BLUETOOTH_SCAN',
+            {
+              title: 'Bluetooth Scan Permission',
+              message: 'This app needs Bluetooth scan permission to discover fitness devices.',
+              buttonNeutral: 'Ask Me Later',
+              buttonNegative: 'Cancel',
+              buttonPositive: 'OK',
+            }
+          );
+          
+          const bluetoothConnectGranted = await PermissionsAndroid.request(
+            'android.permission.BLUETOOTH_CONNECT',
+            {
+              title: 'Bluetooth Connect Permission',
+              message: 'This app needs Bluetooth connect permission to connect to fitness devices.',
+              buttonNeutral: 'Ask Me Later',
+              buttonNegative: 'Cancel',
+              buttonPositive: 'OK',
+            }
+          );
+          
+          // Check for Android 13+ nearby devices permission
+          if (apiLevel >= 33) {
+            const nearbyGranted = await PermissionsAndroid.request(
+              'android.permission.NEARBY_WIFI_DEVICES',
+              {
+                title: 'Nearby Devices Permission',
+                message: 'This app needs Nearby Devices permission to find Bluetooth devices.',
+                buttonPositive: 'OK',
+              }
+            );
+            if (nearbyGranted !== PermissionsAndroid.RESULTS.GRANTED) {
+              Alert.alert('Permission Required', 'Nearby devices permission is required.');
+              return false;
+            }
+          }
+
+          if (bluetoothScanGranted === PermissionsAndroid.RESULTS.GRANTED && 
+              bluetoothConnectGranted === PermissionsAndroid.RESULTS.GRANTED) {
+            console.log('Bluetooth permissions granted (Android 12+)');
+            return true;
+          } else {
+            console.log('Bluetooth permissions denied (Android 12+)');
+            Alert.alert('Permissions Required', 'Bluetooth permissions are required to scan for and connect to fitness devices.');
+            return false;
+          }
         } else {
-          console.log('Location permission denied');
-          Alert.alert('Permission Required', 'Location permission is required to scan for Bluetooth devices.');
-          return false;
+          // Android < 12 permissions - request both fine and coarse location
+          const fineLocationGranted = await PermissionsAndroid.request(
+            PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+            {
+              title: 'Fine Location Permission',
+              message: 'This app needs fine location permission to scan for Bluetooth devices.',
+              buttonNeutral: 'Ask Me Later',
+              buttonNegative: 'Cancel',
+              buttonPositive: 'OK',
+            }
+          );
+          
+          const coarseLocationGranted = await PermissionsAndroid.request(
+            PermissionsAndroid.PERMISSIONS.ACCESS_COARSE_LOCATION,
+            {
+              title: 'Coarse Location Permission', 
+              message: 'This app needs coarse location permission for Bluetooth device discovery.',
+              buttonNeutral: 'Ask Me Later',
+              buttonNegative: 'Cancel',
+              buttonPositive: 'OK',
+            }
+          );
+          
+          if (fineLocationGranted === PermissionsAndroid.RESULTS.GRANTED && 
+              coarseLocationGranted === PermissionsAndroid.RESULTS.GRANTED) {
+            console.log('Location permissions granted (Android < 12)');
+            return true;
+          } else {
+            console.log('Location permissions denied (Android < 12)');
+            Alert.alert('Permissions Required', 'Location permissions are required to scan for Bluetooth devices.');
+            return false;
+          }
         }
       } catch (error) {
         console.error('Permission request error:', error);
@@ -424,6 +548,79 @@ class BLEService {
   // ============================================================================
 
   /**
+   * Tries to connect directly to the target device using MAC address (Android API 31+)
+   * Bypasses scanning for devices that have BLE scanning issues
+   * 
+   * @returns Promise<boolean> - True if connection successful, false otherwise
+   */
+  async tryDirectConnection(): Promise<boolean> {
+    try {
+      console.log('[FUNFEET_BLE] 🎯 Attempting direct connection to target device...');
+      
+      const TARGET_MAC = "00:4B:12:35:0C:AE";
+      
+      // Check permissions first
+      console.log('[FUNFEET_BLE] 🔐 Checking permissions for direct connection...');
+      const permissionsOK = await this.checkPermissions();
+      if (!permissionsOK) {
+        console.log('[FUNFEET_BLE] ❌ Permissions not granted for direct connection');
+        return false;
+      }
+      console.log('[FUNFEET_BLE] ✅ Permissions OK for direct connection');
+
+      // Check Bluetooth state
+      console.log('[FUNFEET_BLE] 📡 Checking Bluetooth state for direct connection...');
+      const bluetoothOK = await this.checkAndEnableBluetooth();
+      if (!bluetoothOK) {
+        console.log('[FUNFEET_BLE] ❌ Bluetooth not ready for direct connection');
+        return false;
+      }
+      console.log('[FUNFEET_BLE] ✅ Bluetooth ready for direct connection');
+
+      // Wait for BLE manager to be ready
+      console.log('[FUNFEET_BLE] ⏳ Waiting for BLE manager to be ready for direct connection...');
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
+      // Try to connect directly using the MAC address
+      console.log('[FUNFEET_BLE] 🔗 Attempting direct connection to:', TARGET_MAC);
+      
+      try {
+        // Try to get the device directly
+        const devices = await this.manager.devices([TARGET_MAC]);
+        if (devices.length > 0) {
+          console.log('[FUNFEET_BLE] ✅ Found device directly, attempting connection...');
+          const connected = await this.connectToDevice(TARGET_MAC);
+          if (connected) {
+            console.log('[FUNFEET_BLE] 🎉 Direct connection successful!');
+            return true;
+          }
+        } else {
+          console.log('[FUNFEET_BLE] ❌ Device not found for direct connection');
+          
+          // Try force connection - attempt to connect even if device not found
+          console.log('[FUNFEET_BLE] 🔧 Attempting force connection...');
+          try {
+            const connected = await this.connectToDevice(TARGET_MAC);
+            if (connected) {
+              console.log('[FUNFEET_BLE] 🎉 Force connection successful!');
+              return true;
+            }
+          } catch (forceError) {
+            console.log('[FUNFEET_BLE] ❌ Force connection failed:', forceError);
+          }
+        }
+      } catch (directError) {
+        console.log('[FUNFEET_BLE] ❌ Direct connection failed:', directError);
+      }
+      
+      return false;
+    } catch (error) {
+      console.error('[FUNFEET_BLE] ❌ Direct connection error:', error);
+      return false;
+    }
+  }
+
+  /**
    * Starts scanning for BLE devices
    * Handles permissions, Bluetooth state, and device discovery
    * 
@@ -439,53 +636,194 @@ class BLEService {
    */
   async startScan(): Promise<boolean> {
     try {
+      console.log('[FUNFEET_BLE] 🚀 Starting BLE scan process...');
+      
+      // Direct connection disabled - always use manual scanning
+      console.log('[FUNFEET_BLE] 📱 Direct connection disabled, using manual scanning...');
+      
+      // Stop any existing scan first
+      if (this.isScanning) {
+        console.log('[FUNFEET_BLE] 🛑 Stopping existing scan...');
+        try {
+          this.manager.stopDeviceScan();
+          this.isScanning = false;
+          await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second
+        } catch (error) {
+          console.log('[FUNFEET_BLE] ⚠️ Error stopping existing scan:', error);
+        }
+      }
+
       // Check permissions first
+      console.log('[FUNFEET_BLE] 🔐 Checking permissions...');
       const permissionsOK = await this.checkPermissions();
-      if (!permissionsOK) return false;
+      if (!permissionsOK) {
+        console.log('[FUNFEET_BLE] ❌ Permissions not granted');
+        return false;
+      }
+      console.log('[FUNFEET_BLE] ✅ Permissions OK');
 
       // Check Bluetooth state
+      console.log('[FUNFEET_BLE] 📡 Checking Bluetooth state...');
       const bluetoothOK = await this.checkAndEnableBluetooth();
-      if (!bluetoothOK) return false;
+      if (!bluetoothOK) {
+        console.log('[FUNFEET_BLE] ❌ Bluetooth not ready');
+        return false;
+      }
+      console.log('[FUNFEET_BLE] ✅ Bluetooth ready');
 
-      // Prevent multiple simultaneous scans
-      if (this.isScanning) return true;
+      // Wait for BLE manager to be ready
+      console.log('[FUNFEET_BLE] ⏳ Waiting for BLE manager to be ready...');
+      await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds
+
+      // Additional state check
+      const currentState = await this.manager.state();
+      console.log('[FUNFEET_BLE] 📡 Current BLE state:', currentState);
+      
+      if (currentState !== 'PoweredOn') {
+        console.log('[FUNFEET_BLE] ❌ BLE not powered on, cannot scan. State:', currentState);
+        return false;
+      }
 
       // Start scanning
       this.isScanning = true;
       this.devices.clear();
       this.notifyDevicesChange();
       
-      // Configure scan parameters and start device discovery
-      this.manager.startDeviceScan(null, { allowDuplicates: false }, (error, device) => {
+      console.log('[FUNFEET_BLE] 🔍 Starting BLE device scan...');
+      console.log('[FUNFEET_BLE] 📱 Device info:', Platform.OS, Platform.Version);
+      console.log('[FUNFEET_BLE] 🎯 Looking for target device:', "00:4B:12:35:0C:AE");
+      
+      // Use SIMPLE scan options to avoid compatibility issues
+      console.log('[FUNFEET_BLE] 🔧 Using SIMPLE scan options for maximum compatibility');
+      
+      // Try the simplest possible scan first
+      console.log('[FUNFEET_BLE] 📋 Starting basic device scan with no options...');
+      
+      try {
+        this.manager.startDeviceScan(null, null, (error, device) => {
         if (error) {
-          console.error('Scan error:', error.message);
+          console.error('[FUNFEET_BLE] Scan error:', error.message);
+          console.error('[FUNFEET_BLE] Error details:', error);
           this.isScanning = false;
           return;
         }
 
-        // Add valid devices to the list
-        if (device && device.id && device.name && device.name.trim() !== '') {
+        // Log EVERY device that gets discovered, even if we don't add it
+        if (device) {
+          console.log('[FUNFEET_BLE] 🔍 Device discovered:', {
+            id: device.id,
+            name: device.name || 'No name',
+            rssi: device.rssi,
+            isConnectable: device.isConnectable,
+            serviceUUIDs: device.serviceUUIDs,
+            manufacturerData: device.manufacturerData,
+            serviceData: device.serviceData
+          });
+        } else {
+          console.log('[FUNFEET_BLE] 🔍 Scan callback called with no device');
+        }
+
+        // DEBUGGING MODE: Add ALL devices to help identify the target device
+        // Temporarily show all devices to help with debugging
+        const TARGET_MAC = "00:4B:12:35:0C:AE";
+        const isTargetDevice = device && device.id && (
+          device.id === TARGET_MAC || 
+          device.id.includes(TARGET_MAC.replace(/:/g, '')) ||
+          device.id.toLowerCase() === TARGET_MAC.toLowerCase() ||
+          device.id.toLowerCase().includes(TARGET_MAC.toLowerCase().replace(/:/g, ''))
+        );
+        
+        // TEMPORARY: Add ALL discovered devices for debugging
+        if (device && device.id) {
           const bleDevice: BLEDevice = {
             id: device.id,
-            name: device.name,
+            name: device.name || (isTargetDevice ? 'FunFeet Device' : `Unknown-${device.id.slice(-4)}`),
             rssi: device.rssi,
             isConnected: false,
           };
           this.devices.set(device.id, bleDevice);
           this.notifyDevicesChange();
+          
+          // Log device discovery
+          if (isTargetDevice) {
+            console.log('[FUNFEET_BLE] 🎯 TARGET DEVICE FOUND:', device.id, 'Name:', device.name || 'No name');
+          } else {
+            console.log('[FUNFEET_BLE] 📱 Device added to list:', device.id, 'Name:', device.name || 'No name', 'RSSI:', device.rssi);
+          }
+        }
+        
+        // Log all discovered devices for debugging compatibility issues
+        if (device && device.id) {
+          console.log('[FUNFEET_BLE] 🔍 ALL DEVICES FOUND:', {
+            id: device.id,
+            name: device.name,
+            rssi: device.rssi,
+            localName: device.localName,
+            manufacturerData: device.manufacturerData,
+            serviceUUIDs: device.serviceUUIDs,
+            isConnectable: device.isConnectable,
+            rawScanRecord: device.rawScanRecord
+          });
+          
+          // Check if this could be our target device by MAC pattern
+          const TARGET_MAC = "00:4B:12:35:0C:AE";
+          const deviceId = device.id.toLowerCase();
+          const targetMac = TARGET_MAC.toLowerCase();
+          
+          console.log('[FUNFEET_BLE] 🎯 MAC COMPARISON:', {
+            deviceId: deviceId,
+            targetMac: targetMac,
+            exactMatch: deviceId === targetMac,
+            containsMatch: deviceId.includes(targetMac.replace(/:/g, '')),
+            partialMatch: targetMac.includes(deviceId) || deviceId.includes(targetMac)
+          });
         }
       });
+      
+      console.log('[FUNFEET_BLE] ✅ Scan started successfully');
+      
+      } catch (scanError) {
+        console.error('[FUNFEET_BLE] ❌ Failed to start scan:', scanError);
+        this.isScanning = false;
+        return false;
+      }
 
-      // Auto-stop scan after 15 seconds
+      // Auto-stop scan after 2 minutes (120 seconds)
       setTimeout(() => {
+        console.log('[FUNFEET_BLE] ⏰ Auto-stopping scan after 2 minutes at:', new Date().toISOString());
         this.stopScan();
-      }, 15000);
+        
+        // Report scan results
+        console.log(`[FUNFEET_BLE] 📊 Enhanced scan completed. Found ${this.devices.size} devices.`);
+        if (this.devices.size === 0) {
+          console.log('[FUNFEET_BLE] ❌ No devices found with enhanced scan');
+          console.log('[FUNFEET_BLE] 💡 Try manually triggering fallback scan if needed');
+          // Disabled automatic fallback to prevent errors
+          // You can manually trigger fallback scan if needed
+        }
+      }, 120000);
 
       return true;
     } catch (error) {
-      console.error('Start scan error:', error);
+      console.error('[FUNFEET_BLE] ❌ Start scan error:', error);
+      console.error('[FUNFEET_BLE] ❌ Error details:', error instanceof Error ? error.message : String(error), error instanceof Error ? error.stack : undefined);
       this.isScanning = false;
-      Alert.alert('Error', 'Failed to start scanning.');
+      
+      // Try recreating BLE manager if scan fails
+      console.log('[FUNFEET_BLE] 🔄 Scan failed, trying to recreate BLE manager...');
+      try {
+        await this.recreateBLEManager();
+        console.log('[FUNFEET_BLE] ✅ BLE manager recreated, you can try scanning again');
+        Alert.alert(
+          'Scanning Issue', 
+          'BLE manager was reset. Please try scanning again.',
+          [{ text: 'OK' }]
+        );
+      } catch (recreateError) {
+        console.error('[FUNFEET_BLE] ❌ Failed to recreate BLE manager:', recreateError);
+        Alert.alert('Error', 'Failed to start scanning. Please restart the app.');
+      }
+      
       return false;
     }
   }
@@ -496,10 +834,88 @@ class BLEService {
    */
   stopScan(): void {
     try {
+      console.log('[FUNFEET_BLE] 🛑 Stopping scan - was scanning:', this.isScanning);
       this.manager.stopDeviceScan();
       this.isScanning = false;
+      console.log('[FUNFEET_BLE] ✅ Scan stopped successfully');
     } catch (error) {
-      console.error('Stop scan error:', error);
+      console.error('[FUNFEET_BLE] ❌ Stop scan error:', error);
+      this.isScanning = false;
+    }
+  }
+
+  /**
+   * Fallback scan with basic options for devices that have trouble with enhanced scanning
+   * Uses minimal scan options for maximum compatibility
+   */
+  private async startFallbackScan(): Promise<void> {
+    try {
+      if (this.isScanning) {
+        console.log('🔄 Already scanning, skipping fallback scan');
+        return;
+      }
+
+      console.log('🔄 Starting fallback scan with basic options...');
+      
+      // Check BLE state before starting fallback scan
+      const currentState = await this.manager.state();
+      console.log('📡 BLE state for fallback scan:', currentState);
+      
+      if (currentState !== 'PoweredOn') {
+        console.log('❌ BLE not powered on for fallback scan, state:', currentState);
+        return;
+      }
+
+      // Check permissions again
+      const permissionsOK = await this.checkPermissions();
+      if (!permissionsOK) {
+        console.log('❌ Permissions not available for fallback scan');
+        return;
+      }
+
+      this.isScanning = true;
+
+      // Use minimal scan options for maximum compatibility
+      console.log('🔧 Using basic scan options for fallback');
+      
+      this.manager.startDeviceScan(null, null, (error, device) => {
+        if (error) {
+          console.error('❌ Fallback scan error:', error.message, error);
+          this.isScanning = false;
+          return;
+        }
+
+        // Log ALL devices found in fallback scan
+        if (device && device.id) {
+          console.log('🔄 FALLBACK DEVICE FOUND:', {
+            id: device.id,
+            name: device.name,
+            rssi: device.rssi,
+            isConnectable: device.isConnectable
+          });
+
+          // Add ALL devices to help with debugging
+          const bleDevice: BLEDevice = {
+            id: device.id,
+            name: device.name || `Fallback-${device.id.slice(-4)}`,
+            rssi: device.rssi,
+            isConnected: false,
+          };
+          this.devices.set(device.id, bleDevice);
+          this.notifyDevicesChange();
+          
+          console.log('✅ Fallback device added:', device.id);
+        }
+      });
+
+      // Stop fallback scan after 10 seconds
+      setTimeout(() => {
+        console.log('⏰ Stopping fallback scan after 10 seconds');
+        this.stopScan();
+      }, 10000);
+
+    } catch (error) {
+      console.error('💥 Fallback scan exception:', error);
       this.isScanning = false;
     }
   }
@@ -542,8 +958,10 @@ class BLEService {
    * ```
    */
   async connectToDevice(deviceId: string): Promise<boolean> {
+    console.log('BLE_SERVICE [CONNECT] Connecting to device:', deviceId);
+
     if (this.isDestroyed) return false;
-    
+
     try {
       // Disconnect from any existing device
       if (this.connectedDevice) {
@@ -561,8 +979,8 @@ class BLEService {
       const connectedDevice = await device[0].connect();
       
       // Setup connection monitoring for this device
-      this.deviceConnectionSubscription = connectedDevice.onDisconnected((error, device) => {
-        console.log('Device disconnected:', device?.id, error);
+      this.deviceConnectionSubscription = connectedDevice.onDisconnected((error, disconnectedDevice) => {
+        console.log('Device disconnected:', disconnectedDevice?.id, error);
         this.handleDeviceDisconnection(deviceId);
       });
 
@@ -653,7 +1071,7 @@ class BLEService {
         CHARACTERISTIC_UUID,
         CHARACTERISTIC_UUID1,
         CHARACTERISTIC_UUID2,
-        CHARACTERISTIC_UUID3
+        CHARACTERISTIC_CYCLES_UUID
       ];
 
       let foundCount = 0;
@@ -718,7 +1136,7 @@ class BLEService {
     for (const [uuid, characteristic] of this.characteristics) {
       try {
         if (characteristic.isNotifiable) {
-          await characteristic.monitor((error, characteristic) => {
+          await characteristic.monitor((error, notificationCharacteristic) => {
             if (this.isDestroyed) return;
             
             if (error) {
@@ -726,9 +1144,9 @@ class BLEService {
               return;
             }
             
-            if (characteristic && characteristic.value) {
+            if (notificationCharacteristic && notificationCharacteristic.value) {
               try {
-                const rawValue = characteristic.value;
+                const rawValue = notificationCharacteristic.value;
                 const decodedValue = decodeUTF8Value(rawValue);
                 
                 console.log('Notification received for', uuid, ':', decodedValue);
@@ -772,26 +1190,54 @@ class BLEService {
    */
   private processCyclingData(uuid: string, value: string) {
     try {
-      let cyclingData: CyclingData = { speed: 0, distance: 0, calories: 0 };
+      let cyclingData: CyclingData = { speed: this.currentSpeed, distance: this.currentDistance, cycles: this.currentCycles, rpm: this.currentRpm };
+      let dataUpdated = false;
       
-      // Parse the value based on characteristic UUID
+      // Parse the value based on final corrected characteristic UUID mapping
       if (uuid.toLowerCase() === CHARACTERISTIC_UUID.toLowerCase()) {
-        cyclingData.speed = parseFloat(value) || 0;
-        this.currentSpeed = cyclingData.speed;
+        // CHARACTERISTIC_UUID actually sends RPM data
+        const parsed = parseFloat(value);
+        if (!isNaN(parsed) && parsed >= 0) {
+          cyclingData.rpm = parsed;
+          this.currentRpm = cyclingData.rpm;
+          dataUpdated = true;
+          console.log('🔄 RPM updated:', parsed);
+        }
       } else if (uuid.toLowerCase() === CHARACTERISTIC_UUID1.toLowerCase()) {
-        cyclingData.distance = parseFloat(value) || 0;
-        this.currentDistance = cyclingData.distance;
+        // CHARACTERISTIC_UUID1 actually sends Speed km/h data  
+        const parsed = parseFloat(value);
+        if (!isNaN(parsed) && parsed >= 0) {
+          cyclingData.speed = parsed;
+          this.currentSpeed = cyclingData.speed;
+          dataUpdated = true;
+          console.log('🔄 Speed updated:', parsed, 'km/h');
+        }
       } else if (uuid.toLowerCase() === CHARACTERISTIC_UUID2.toLowerCase()) {
-        cyclingData.calories = parseFloat(value) || 0;
-        this.currentCalories = cyclingData.calories;
+        // CHARACTERISTIC_UUID2 actually sends Distance km data
+        const parsed = parseFloat(value);
+        if (!isNaN(parsed) && parsed >= 0) {
+          cyclingData.distance = parsed;
+          this.currentDistance = cyclingData.distance;
+          dataUpdated = true;
+          console.log('🔄 Distance updated:', parsed, 'km');
+        }
+      } else if (uuid.toLowerCase() === CHARACTERISTIC_CYCLES_UUID.toLowerCase()) {
+        // CHARACTERISTIC_CYCLES_UUID actually sends Cycles count (from calories characteristic)
+        const parsed = parseFloat(value);
+        if (!isNaN(parsed) && parsed >= 0) {
+          cyclingData.cycles = parsed;
+          this.currentCycles = cyclingData.cycles;
+          dataUpdated = true;
+          console.log('🔄 Cycles updated:', parsed);
+        }
       }
       
-      // Notify listeners of cycling data changes
-      if (this.onCyclingDataChange) {
+      // Only notify listeners if data was actually updated
+      if (dataUpdated && this.onCyclingDataChange) {
         this.onCyclingDataChange(cyclingData);
       }
     } catch (error) {
-      console.error('Error processing cycling data:', error);
+      console.error('❌ Error processing cycling data:', error);
     }
   }
 
@@ -856,7 +1302,8 @@ class BLEService {
     return {
       speed: this.currentSpeed,
       distance: this.currentDistance,
-      calories: this.currentCalories
+      cycles: this.currentCycles,
+      rpm: this.currentRpm
     };
   }
 

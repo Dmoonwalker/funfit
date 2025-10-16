@@ -1,0 +1,101 @@
+id,section,subsection,question_number,question_text,question_type,options,is_required,created_at,updated_at
+00da84cc-0a34-48c5-accd-891da6992df5,COMMUNITY_DATA,COMMUNITY_SUPPORT,57,Does the community support school activities?,yes_no,,true,2025-07-11 11:53:55.32299+00,2025-07-11 11:53:55.32299+00
+01d5d66b-d95e-4839-8284-b7f3c9063437,SCHOOL_INFRASTRUCTURE,BUILDINGS,7,Are the classroom floors in good condition?,yes_no,,true,2025-07-11 11:53:55.32299+00,2025-07-11 11:53:55.32299+00
+036fa6eb-a7a9-4f60-968c-be550fee1c3f,INFRASTRUCTURE_DEVELOPMENT,RECENT_IMPROVEMENTS,63,What improvements were made?,text,,false,2025-07-11 11:53:55.32299+00,2025-07-11 11:53:55.32299+00
+0ab0bb79-629b-4cee-9080-c6efd28dbb6f,SCHOOL_INFRASTRUCTURE,TOILETS,12,Is there running water in the toilets?,yes_no,,true,2025-07-11 11:53:55.32299+00,2025-07-11 11:53:55.32299+00
+0b921aaf-134d-4f07-a2f5-bd2abc6d10c7,INFRASTRUCTURE_DEVELOPMENT,GENERAL,80,Are there any safety concerns with the current infrastructure?,yes_no,,true,2025-07-11 11:53:55.32299+00,2025-07-11 11:53:55.32299+00
+0d563140-f65f-435e-997f-b5c32bb6e807,INFRASTRUCTURE_DEVELOPMENT,GENERAL,81,"If yes, what are the safety concerns?",text,,false,2025-07-11 11:53:55.32299+00,2025-07-11 11:53:55.32299+00
+0e2dbb68-6a84-4208-8a61-9ff569d037ff,INFRASTRUCTURE_DEVELOPMENT,MAINTENANCE,74,Who is responsible for maintenance?,multiple_choice,"[""School Staff"",""Community"",""Government"",""Contractors"",""Combination""]",true,2025-07-11 11:53:55.32299+00,2025-07-11 11:53:55.32299+00
+0f7d616a-469b-4be8-9c08-fa497a6861a1,SCHOOL_INFRASTRUCTURE,WATER_SUPPLY,18,How many water points are available in the school?,number,,true,2025-07-11 11:53:55.32299+00,2025-07-11 11:53:55.32299+00
+127a8b1e-5507-46c6-9d9c-ae6159847f49,SCHOOL_INFRASTRUCTURE,BUILDINGS,3,Are there any classrooms that need urgent repairs?,yes_no,,true,2025-07-11 11:53:55.32299+00,2025-07-11 11:53:55.32299+00
+136693f4-c1cd-4823-9c89-8eec7e039256,SCHOOL_INFRASTRUCTURE,FURNITURE,26,How many students share one desk?,number,,true,2025-07-11 11:53:55.32299+00,2025-07-11 11:53:55.32299+00
+155c08a0-9c4e-44bf-a279-fc20dcd9c981,INFRASTRUCTURE_DEVELOPMENT,MAINTENANCE,76,What is the annual maintenance budget?,number,,false,2025-07-11 11:53:55.32299+00,2025-07-11 11:53:55.32299+00
+176f6f39-a804-46df-b34a-06ce809f3301,INFRASTRUCTURE_DEVELOPMENT,GENERAL,100,What is the condition of the science labs?,multiple_choice,"[""Excellent"",""Good"",""Fair"",""Poor"",""Very Poor""]",false,2025-07-11 11:53:55.32299+00,2025-07-11 11:53:55.32299+00
+1905e5b3-c75b-4f9d-80d4-8547dddd4b5e,SCHOOL_INFRASTRUCTURE,ELECTRICITY,22,Is the electricity supply reliable?,yes_no,,true,2025-07-11 11:53:55.32299+00,2025-07-11 11:53:55.32299+00
+1ad9e81a-c4cb-4a39-b022-1e367b1286d9,COMMUNITY_DATA,COMMUNITY_SUPPORT,60,Does the community provide security for the school?,yes_no,,true,2025-07-11 11:53:55.32299+00,2025-07-11 11:53:55.32299+00
+1b364eaf-7598-4be9-9378-908d1c366095,INFRASTRUCTURE_DEVELOPMENT,GENERAL,83,What accessibility improvements are needed?,text,,false,2025-07-11 11:53:55.32299+00,2025-07-11 11:53:55.32299+00
+1e6eb026-3633-4b23-af40-600d941f2ad6,INFRASTRUCTURE_DEVELOPMENT,GENERAL,95,How many books are in the library?,number,,false,2025-07-11 11:53:55.32299+00,2025-07-11 11:53:55.32299+00
+1ed3addb-047b-4bdd-9407-d4618adfcaac,INFRASTRUCTURE_DEVELOPMENT,GENERAL,96,Is there a computer lab?,yes_no,,true,2025-07-11 11:53:55.32299+00,2025-07-11 11:53:55.32299+00
+20edcd79-dd07-4a53-b14b-e5a6d9ad7b62,INFRASTRUCTURE_DEVELOPMENT,GENERAL,85,Is there a first aid kit available?,yes_no,,true,2025-07-11 11:53:55.32299+00,2025-07-11 11:53:55.32299+00
+2403553f-26b9-4a04-a487-b7d342623b61,INFRASTRUCTURE_DEVELOPMENT,GENERAL,89,Are there adequate ventilation systems?,yes_no,,true,2025-07-11 11:53:55.32299+00,2025-07-11 11:53:55.32299+00
+2524eeb2-33c4-419d-830e-f8002e69e0e7,SCHOOL_INFRASTRUCTURE,BUILDINGS,6,How many classrooms have proper windows and doors?,number,,true,2025-07-11 11:53:55.32299+00,2025-07-11 11:53:55.32299+00
+261f2187-b2d8-405b-b18b-27cf7b5dac60,STUDENT_DATA,ENROLLMENT,45,What is the attendance rate today?,percentage,,true,2025-07-11 11:53:55.32299+00,2025-07-11 11:53:55.32299+00
+26491cb6-4208-4009-99b1-b545c6087cb9,COMMUNITY_DATA,PARENTAL_INVOLVEMENT,55,Do parents contribute to school development?,yes_no,,true,2025-07-11 11:53:55.32299+00,2025-07-11 11:53:55.32299+00
+2743243a-f206-46ad-9d75-26c4d2f70d45,HUMAN_RESOURCES,TEACHERS,35,Are teachers regularly attending school?,yes_no,,true,2025-07-11 11:53:55.32299+00,2025-07-11 11:53:55.32299+00
+281007a3-c94d-4d47-abfa-22254f01886b,STUDENT_DATA,ENROLLMENT,44,How many students are present today?,number,,true,2025-07-11 11:53:55.32299+00,2025-07-11 11:53:55.32299+00
+2c5d8663-82b3-4773-8191-2cda6b59c494,INFRASTRUCTURE_DEVELOPMENT,PLANNED_PROJECTS,70,What is the estimated cost of planned projects?,number,,false,2025-07-11 11:53:55.32299+00,2025-07-11 11:53:55.32299+00
+2e8dfa0b-8a82-4927-8efe-6320815a7d2f,STUDENT_DATA,PERFORMANCE,51,How often are examinations conducted?,multiple_choice,"[""Weekly"",""Monthly"",""Termly"",""Annually"",""Other""]",true,2025-07-11 11:53:55.32299+00,2025-07-11 11:53:55.32299+00
+308e4976-4801-4b34-b5b1-e8c36cbd6308,INFRASTRUCTURE_DEVELOPMENT,GENERAL,77,What are the most urgent infrastructure needs?,text,,true,2025-07-11 11:53:55.32299+00,2025-07-11 11:53:55.32299+00
+326a54ed-1e50-4bc9-ba65-d3e619f85527,SCHOOL_INFRASTRUCTURE,WATER_SUPPLY,17,Is the water safe for drinking?,yes_no,,true,2025-07-11 11:53:55.32299+00,2025-07-11 11:53:55.32299+00
+32a3fab2-7845-40db-8aa9-9c5d953e0111,INFRASTRUCTURE_DEVELOPMENT,RECENT_IMPROVEMENTS,65,How much was spent on recent improvements?,number,,false,2025-07-11 11:53:55.32299+00,2025-07-11 11:53:55.32299+00
+32e5896d-390e-42d9-ace7-e96593c7a136,COMMUNITY_DATA,COMMUNITY_SUPPORT,59,How many community volunteers are involved?,number,,false,2025-07-11 11:53:55.32299+00,2025-07-11 11:53:55.32299+00
+33f7fa32-ff0e-4a07-8a11-bdaf69fe6c15,INFRASTRUCTURE_DEVELOPMENT,GENERAL,99,Are there science laboratories?,yes_no,,true,2025-07-11 11:53:55.32299+00,2025-07-11 11:53:55.32299+00
+387f907c-bb03-4508-a087-b82857c62670,INFRASTRUCTURE_DEVELOPMENT,GENERAL,91,Are there sports facilities available?,yes_no,,true,2025-07-11 11:53:55.32299+00,2025-07-11 11:53:55.32299+00
+3ece08a4-a785-46aa-9be2-34264a364524,STUDENT_DATA,ENROLLMENT,41,What is the total number of students enrolled?,number,,true,2025-07-11 11:53:55.32299+00,2025-07-11 11:53:55.32299+00
+44b258b1-4f4e-4f75-9ebf-a48ed0c332c3,SCHOOL_INFRASTRUCTURE,ELECTRICITY,21,How many classrooms have electricity?,number,,true,2025-07-11 11:53:55.32299+00,2025-07-11 11:53:55.32299+00
+456e8f28-60d2-42c3-88ad-47482940ca00,SCHOOL_INFRASTRUCTURE,FURNITURE,25,Do all students have desks and chairs?,yes_no,,true,2025-07-11 11:53:55.32299+00,2025-07-11 11:53:55.32299+00
+46245447-52f0-4c14-9eba-4459b9447d25,SCHOOL_INFRASTRUCTURE,WATER_SUPPLY,15,Is there a reliable source of water in the school?,yes_no,,true,2025-07-11 11:53:55.32299+00,2025-07-11 11:53:55.32299+00
+4815487c-fead-4e06-8f9c-e52691233f58,HUMAN_RESOURCES,TEACHERS,34,How many teachers have received training in the last year?,number,,true,2025-07-11 11:53:55.32299+00,2025-07-11 11:53:55.32299+00
+549800b3-c99c-49bb-9e10-858961bb67f2,STUDENT_DATA,ENROLLMENT,43,How many female students are enrolled?,number,,true,2025-07-11 11:53:55.32299+00,2025-07-11 11:53:55.32299+00
+56da5c1f-bb6b-475d-8db9-3dccbe4a9c73,STUDENT_DATA,ENROLLMENT,42,How many male students are enrolled?,number,,true,2025-07-11 11:53:55.32299+00,2025-07-11 11:53:55.32299+00
+578b4270-88c9-4c67-893e-2777232c61fb,INFRASTRUCTURE_DEVELOPMENT,PLANNED_PROJECTS,67,Are there planned infrastructure projects?,yes_no,,true,2025-07-11 11:53:55.32299+00,2025-07-11 11:53:55.32299+00
+5acb7cd6-d6ec-4241-9785-78b51cba311f,HUMAN_RESOURCES,NON_TEACHING_STAFF,37,How many non-teaching staff are employed?,number,,true,2025-07-11 11:53:55.32299+00,2025-07-11 11:53:55.32299+00
+61fb5477-b464-42e4-8ffd-4af9402bdb20,INFRASTRUCTURE_DEVELOPMENT,GENERAL,84,Are there adequate emergency exits?,yes_no,,true,2025-07-11 11:53:55.32299+00,2025-07-11 11:53:55.32299+00
+62aed720-97c4-4733-b244-e621f5cd0ce7,INFRASTRUCTURE_DEVELOPMENT,RECENT_IMPROVEMENTS,66,Are there ongoing construction projects?,yes_no,,true,2025-07-11 11:53:55.32299+00,2025-07-11 11:53:55.32299+00
+642c16de-d928-48de-8bb0-574d8baa809c,SCHOOL_INFRASTRUCTURE,FURNITURE,28,Are there enough chairs for teachers?,yes_no,,true,2025-07-11 11:53:55.32299+00,2025-07-11 11:53:55.32299+00
+65f9ca60-c444-4318-a4bf-e203a5512aab,INFRASTRUCTURE_DEVELOPMENT,GENERAL,94,What is the condition of the library?,multiple_choice,"[""Excellent"",""Good"",""Fair"",""Poor"",""Very Poor""]",false,2025-07-11 11:53:55.32299+00,2025-07-11 11:53:55.32299+00
+6baf395a-071b-4c5e-9002-d11673207d79,STUDENT_DATA,PERFORMANCE,50,Are there remedial classes for struggling students?,yes_no,,true,2025-07-11 11:53:55.32299+00,2025-07-11 11:53:55.32299+00
+6e0086c3-8758-4753-a8cb-5f8a5f8e0bf3,INFRASTRUCTURE_DEVELOPMENT,GENERAL,93,Is there a library or reading room?,yes_no,,true,2025-07-11 11:53:55.32299+00,2025-07-11 11:53:55.32299+00
+6fb5d790-dc33-494f-9d72-9a2dfb9cefd1,INFRASTRUCTURE_DEVELOPMENT,RECENT_IMPROVEMENTS,62,Have there been any infrastructure improvements in the last year?,yes_no,,true,2025-07-11 11:53:55.32299+00,2025-07-11 11:53:55.32299+00
+7204d844-5873-4813-97b5-61428adacd78,INFRASTRUCTURE_DEVELOPMENT,GENERAL,90,What is the condition of the school playground?,multiple_choice,"[""Excellent"",""Good"",""Fair"",""Poor"",""Very Poor""]",true,2025-07-11 11:53:55.32299+00,2025-07-11 11:53:55.32299+00
+721abb58-ab0b-44da-a340-41adc9ad8ff1,HUMAN_RESOURCES,TEACHERS,32,What is the highest qualification of the head teacher?,multiple_choice,"[""NCE"",""B.Ed"",""M.Ed"",""PhD"",""Other""]",true,2025-07-11 11:53:55.32299+00,2025-07-11 11:53:55.32299+00
+73ecd8ce-da1f-4402-befe-cae8deeb7b86,STUDENT_DATA,ENROLLMENT,46,Are there students with special needs?,yes_no,,true,2025-07-11 11:53:55.32299+00,2025-07-11 11:53:55.32299+00
+75962af0-2c79-4fcd-ae57-b0078579cda0,INFRASTRUCTURE_DEVELOPMENT,RECENT_IMPROVEMENTS,64,Who funded the recent improvements?,multiple_choice,"[""Government"",""Community"",""PTA"",""NGO"",""Private Donor"",""Multiple Sources""]",false,2025-07-11 11:53:55.32299+00,2025-07-11 11:53:55.32299+00
+763ee238-2cda-401c-9ecc-aeba2a4990c9,HUMAN_RESOURCES,NON_TEACHING_STAFF,38,Are there security personnel in the school?,yes_no,,true,2025-07-11 11:53:55.32299+00,2025-07-11 11:53:55.32299+00
+76e84ff6-842b-4849-aadb-11f36f43aba6,INFRASTRUCTURE_DEVELOPMENT,MAINTENANCE,75,Is there a maintenance budget?,yes_no,,true,2025-07-11 11:53:55.32299+00,2025-07-11 11:53:55.32299+00
+7969f9b1-3c57-4f06-8e50-b976d6d1b063,INFRASTRUCTURE_DEVELOPMENT,PLANNED_PROJECTS,69,When are the planned projects expected to start?,text,,false,2025-07-11 11:53:55.32299+00,2025-07-11 11:53:55.32299+00
+79e43027-6f22-437f-b740-0ecc427bbf4a,STUDENT_DATA,ENROLLMENT,47,How many students with special needs are enrolled?,number,,false,2025-07-11 11:53:55.32299+00,2025-07-11 11:53:55.32299+00
+7b740132-8f67-4a11-9d10-7ce882cc5d57,SCHOOL_INFRASTRUCTURE,WATER_SUPPLY,19,Are there water storage facilities?,yes_no,,true,2025-07-11 11:53:55.32299+00,2025-07-11 11:53:55.32299+00
+82a93b76-96c4-46a7-81ee-980e398342ae,SCHOOL_INFRASTRUCTURE,TOILETS,11,Are the toilets functional and clean?,yes_no,,true,2025-07-11 11:53:55.32299+00,2025-07-11 11:53:55.32299+00
+8b4283bb-e7bb-4e09-9b66-7df3dc7f7245,SCHOOL_INFRASTRUCTURE,TOILETS,10,How many toilet facilities are available?,number,,true,2025-07-11 11:53:55.32299+00,2025-07-11 11:53:55.32299+00
+90ad18a3-0050-4117-b7c5-930d5ee1a9d2,COMMUNITY_DATA,PARENTAL_INVOLVEMENT,53,Are parents actively involved in school activities?,yes_no,,true,2025-07-11 11:53:55.32299+00,2025-07-11 11:53:55.32299+00
+9453fa8e-25b7-4bfa-97ea-b8406101de50,SCHOOL_INFRASTRUCTURE,BUILDINGS,2,How many classrooms are there in the school?,number,,true,2025-07-11 11:53:55.32299+00,2025-07-11 11:53:55.32299+00
+98adcda8-e8bd-40b5-b267-34fefe00eb2a,HUMAN_RESOURCES,TEACHERS,33,Are there enough teachers for all subjects?,yes_no,,true,2025-07-11 11:53:55.32299+00,2025-07-11 11:53:55.32299+00
+99869b7e-ca7d-4768-94af-12d6ce8c85f6,INFRASTRUCTURE_DEVELOPMENT,GENERAL,79,What improvements would have the biggest impact on student learning?,text,,true,2025-07-11 11:53:55.32299+00,2025-07-11 11:53:55.32299+00
+9a5ffc57-4bd4-409f-b709-2f09178e91d6,SCHOOL_INFRASTRUCTURE,BUILDINGS,1,Are the classrooms in good condition?,yes_no,,true,2025-07-11 11:53:55.32299+00,2025-07-11 11:53:55.32299+00
+a236d476-54c4-4ce9-9aba-704b243b5d2a,SCHOOL_INFRASTRUCTURE,BUILDINGS,8,What is the condition of the school walls?,multiple_choice,"[""Excellent"",""Good"",""Fair"",""Poor"",""Very Poor""]",true,2025-07-11 11:53:55.32299+00,2025-07-11 11:53:55.32299+00
+a34b09b4-0af4-47d4-bbe2-7b4e438c0334,SCHOOL_INFRASTRUCTURE,FURNITURE,27,What is the condition of the furniture?,multiple_choice,"[""Excellent"",""Good"",""Fair"",""Poor"",""Very Poor""]",true,2025-07-11 11:53:55.32299+00,2025-07-11 11:53:55.32299+00
+a39baf70-c295-45cd-8a8e-ccfdb5575fef,SCHOOL_INFRASTRUCTURE,BUILDINGS,5,Are there any leaking roofs in the school?,yes_no,,true,2025-07-11 11:53:55.32299+00,2025-07-11 11:53:55.32299+00
+a56d9f55-93fd-4072-9910-dce12d8d0350,INFRASTRUCTURE_DEVELOPMENT,GENERAL,82,Is the school accessible to students with disabilities?,yes_no,,true,2025-07-11 11:53:55.32299+00,2025-07-11 11:53:55.32299+00
+a62087c2-9864-4fde-b467-c0b3b0cda411,INFRASTRUCTURE_DEVELOPMENT,GENERAL,92,What sports facilities are available?,text,,false,2025-07-11 11:53:55.32299+00,2025-07-11 11:53:55.32299+00
+a992b5c8-83ee-4847-a043-04d2af4f8d72,HUMAN_RESOURCES,TEACHERS,30,How many teachers are currently employed in the school?,number,,true,2025-07-11 11:53:55.32299+00,2025-07-11 11:53:55.32299+00
+abb2f73b-c141-4394-870e-049aefe5e7fe,INFRASTRUCTURE_DEVELOPMENT,MAINTENANCE,73,How often is maintenance carried out?,multiple_choice,"[""Weekly"",""Monthly"",""Quarterly"",""Annually"",""As needed"",""Never""]",true,2025-07-11 11:53:55.32299+00,2025-07-11 11:53:55.32299+00
+aff2073f-5d0d-44e6-82ca-687c1ec6e129,INFRASTRUCTURE_DEVELOPMENT,MAINTENANCE,72,Is there a regular maintenance schedule?,yes_no,,true,2025-07-11 11:53:55.32299+00,2025-07-11 11:53:55.32299+00
+b064e66a-05f2-432b-b61f-4e010f73752f,SCHOOL_INFRASTRUCTURE,TOILETS,13,What is the condition of the toilet facilities?,multiple_choice,"[""Excellent"",""Good"",""Fair"",""Poor"",""Very Poor""]",true,2025-07-11 11:53:55.32299+00,2025-07-11 11:53:55.32299+00
+b2d50002-3e28-446a-99bb-3d6d017bda9d,INFRASTRUCTURE_DEVELOPMENT,PLANNED_PROJECTS,71,Who will fund the planned projects?,multiple_choice,"[""Government"",""Community"",""PTA"",""NGO"",""Private Donor"",""Multiple Sources"",""Not Determined""]",false,2025-07-11 11:53:55.32299+00,2025-07-11 11:53:55.32299+00
+b2dbb81e-5e70-42ab-aaa1-12b37e1983b5,SCHOOL_INFRASTRUCTURE,TOILETS,9,Are there separate toilets for boys and girls?,yes_no,,true,2025-07-11 11:53:55.32299+00,2025-07-11 11:53:55.32299+00
+b6536487-880b-49dd-9900-48a8040ee37a,HUMAN_RESOURCES,TEACHERS,36,What is the teacher-student ratio?,number,,true,2025-07-11 11:53:55.32299+00,2025-07-11 11:53:55.32299+00
+bf8c007c-b8bd-49b4-9b21-3fab81b806ba,STUDENT_DATA,PERFORMANCE,48,What was the average performance in the last examination?,percentage,,true,2025-07-11 11:53:55.32299+00,2025-07-11 11:53:55.32299+00
+c0e61d41-f973-4025-aed4-10ef78cf2c8d,SCHOOL_INFRASTRUCTURE,BUILDINGS,4,What is the condition of the school roof?,multiple_choice,"[""Excellent"",""Good"",""Fair"",""Poor"",""Very Poor""]",true,2025-07-11 11:53:55.32299+00,2025-07-11 11:53:55.32299+00
+c43f3f63-f850-4f7d-a993-9f4e2c17fb88,SCHOOL_INFRASTRUCTURE,ELECTRICITY,23,"Are there backup power sources (generator, solar)?",yes_no,,true,2025-07-11 11:53:55.32299+00,2025-07-11 11:53:55.32299+00
+c52410ae-d84d-4759-a6e6-f3a67ae358bb,COMMUNITY_DATA,COMMUNITY_SUPPORT,58,Are there community volunteers helping in the school?,yes_no,,true,2025-07-11 11:53:55.32299+00,2025-07-11 11:53:55.32299+00
+c6467446-4a70-4f94-8ced-41a8e0654b5c,COMMUNITY_DATA,PARENTAL_INVOLVEMENT,54,How often are PTA meetings held?,multiple_choice,"[""Monthly"",""Termly"",""Annually"",""As needed"",""Never""]",true,2025-07-11 11:53:55.32299+00,2025-07-11 11:53:55.32299+00
+c96f28bc-b4ec-457d-b761-fdcacc1bf2b9,INFRASTRUCTURE_DEVELOPMENT,GENERAL,98,Is there internet connectivity?,yes_no,,true,2025-07-11 11:53:55.32299+00,2025-07-11 11:53:55.32299+00
+ce332702-e878-42a9-b73b-530edd85d10e,INFRASTRUCTURE_DEVELOPMENT,GENERAL,86,Are there fire safety measures in place?,yes_no,,true,2025-07-11 11:53:55.32299+00,2025-07-11 11:53:55.32299+00
+d40f4a27-505d-4819-9ff9-872742f577f6,HUMAN_RESOURCES,NON_TEACHING_STAFF,39,Are there cleaners/maintenance staff?,yes_no,,true,2025-07-11 11:53:55.32299+00,2025-07-11 11:53:55.32299+00
+d56f8d75-8c4e-496d-abc9-cd7cee53b35a,HUMAN_RESOURCES,TEACHERS,31,How many teachers are present today?,number,,true,2025-07-11 11:53:55.32299+00,2025-07-11 11:53:55.32299+00
+d56fde75-7bd5-4056-8937-5c649d2b5d3a,COMMUNITY_DATA,PARENTAL_INVOLVEMENT,56,What percentage of parents pay school fees regularly?,percentage,,true,2025-07-11 11:53:55.32299+00,2025-07-11 11:53:55.32299+00
+dbbbaa78-90e1-4bc7-ab68-6e9c585da70c,SCHOOL_INFRASTRUCTURE,TOILETS,14,Are there handwashing facilities near the toilets?,yes_no,,true,2025-07-11 11:53:55.32299+00,2025-07-11 11:53:55.32299+00
+dd275f80-d0b1-4865-9227-329e19db0a68,COMMUNITY_DATA,PARENTAL_INVOLVEMENT,52,How many parents attended the last PTA meeting?,number,,true,2025-07-11 11:53:55.32299+00,2025-07-11 11:53:55.32299+00
+dd877e7d-3979-4afb-a6bb-6768bdfe35d8,SCHOOL_INFRASTRUCTURE,WATER_SUPPLY,16,What is the main source of water in the school?,multiple_choice,"[""Borehole"",""Well"",""Tap Water"",""Tanker Supply"",""None""]",true,2025-07-11 11:53:55.32299+00,2025-07-11 11:53:55.32299+00
+ddbc0a24-4170-4576-a4d8-dfaf38ebed4d,INFRASTRUCTURE_DEVELOPMENT,PLANNED_PROJECTS,68,What projects are planned?,text,,false,2025-07-11 11:53:55.32299+00,2025-07-11 11:53:55.32299+00
+dde1f38e-36c3-47ac-9285-81b0860473fa,SCHOOL_INFRASTRUCTURE,ELECTRICITY,20,Is there electricity supply in the school?,yes_no,,true,2025-07-11 11:53:55.32299+00,2025-07-11 11:53:55.32299+00
+df981f2d-464f-4198-970a-8c1a4744e8d7,COMMUNITY_DATA,COMMUNITY_SUPPORT,61,Are there any community development projects supporting the school?,yes_no,,true,2025-07-11 11:53:55.32299+00,2025-07-11 11:53:55.32299+00
+e1bb9c26-83ce-4c8d-9925-71a60c1c2695,INFRASTRUCTURE_DEVELOPMENT,GENERAL,88,Is there adequate lighting in classrooms?,yes_no,,true,2025-07-11 11:53:55.32299+00,2025-07-11 11:53:55.32299+00
+e1d2c436-3301-4587-9df9-a82be1412df0,INFRASTRUCTURE_DEVELOPMENT,GENERAL,78,How would you rate the overall school infrastructure?,multiple_choice,"[""Excellent"",""Good"",""Fair"",""Poor"",""Very Poor""]",true,2025-07-11 11:53:55.32299+00,2025-07-11 11:53:55.32299+00
+e1d777b6-45f1-4f30-9eb1-5276513d9b1f,INFRASTRUCTURE_DEVELOPMENT,GENERAL,97,How many computers are available?,number,,false,2025-07-11 11:53:55.32299+00,2025-07-11 11:53:55.32299+00
+ea6c434e-d11f-42cb-a026-6dd33fd194bf,INFRASTRUCTURE_DEVELOPMENT,GENERAL,87,What is the condition of the school compound/fence?,multiple_choice,"[""Excellent"",""Good"",""Fair"",""Poor"",""Very Poor""]",true,2025-07-11 11:53:55.32299+00,2025-07-11 11:53:55.32299+00
+ed8f6274-2b7c-41b5-9ed9-e2fa746c7f28,STUDENT_DATA,PERFORMANCE,49,How many students passed the last examination?,number,,true,2025-07-11 11:53:55.32299+00,2025-07-11 11:53:55.32299+00
+f11f751c-b9d6-4ede-8d7d-fbcf3f6118ef,SCHOOL_INFRASTRUCTURE,FURNITURE,29,"Are there storage facilities (cupboards, shelves)?",yes_no,,true,2025-07-11 11:53:55.32299+00,2025-07-11 11:53:55.32299+00
+f630a238-356d-413a-90c9-78d5989e3081,HUMAN_RESOURCES,NON_TEACHING_STAFF,40,Is there a school nurse or health personnel?,yes_no,,true,2025-07-11 11:53:55.32299+00,2025-07-11 11:53:55.32299+00
+fd938031-9caf-43b0-ac09-672501b7c21f,SCHOOL_INFRASTRUCTURE,ELECTRICITY,24,What type of backup power is available?,multiple_choice,"[""Generator"",""Solar"",""Battery"",""None""]",false,2025-07-11 11:53:55.32299+00,2025-07-11 11:53:55.32299+00

@@ -209,7 +209,7 @@ const BikeAnimationScreen: React.FC<BikeAnimationScreenProps> = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8F9FA',
+    backgroundColor: 'red',
     justifyContent: 'center',
     alignItems: 'center',
   },

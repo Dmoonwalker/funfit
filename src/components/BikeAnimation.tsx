@@ -11,17 +11,36 @@
  * - Speed-responsive animation timing
  * - Bluetooth connection indicator
  * - Full-screen animation with customizable height
+ * - Liquid glass overlay cards in landscape mode using BlurView
+ * - Enhanced glassmorphism with dynamic liquid effects
+ * - Smooth screen rotation animationsz
  * 
  * @author FunFeet Development Team
- * @version 1.0.0
+ * @version 2.0.0
  * @since 2024
  */
 
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { View, Image, StyleSheet, Dimensions, TouchableOpacity } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import {
+  View,
+  Image,
+  StyleSheet,
+  Dimensions,
+  TouchableOpacity,
+  Animated,
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import NativeBikeAnimation from './NativeBikeAnimation';
+import { useBLE } from '../contexts/BLEContext';
+import { useAuth } from '../contexts/AuthContext';
+import LandscapeMetricsOverlay from './LandscapeMetricsOverlay';
+import InlineStats from './InlineStats';
+import HighscoreCard from '../components/HighscoreCard';
+import { LeaderboardService } from '../services/LeaderboardService';
+// removed useWindowDimensions
 
 // Get screen dimensions for responsive layout
-const { height } = Dimensions.get('window');
+// const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
 // ============================================================================
 // INTERFACE DEFINITIONS
@@ -39,6 +58,12 @@ interface BikeAnimationProps {
   gender: 'male' | 'female';
   /** Optional callback for Bluetooth icon press */
   onBluetoothPress?: () => void;
+  /** Optional callback for menu icon press */
+  onMenuPress?: () => void;
+  /** Session goal distance in km for progress bar */
+  sessionGoalKm?: number;
+  /** Animation resize mode - 'stretch' | 'contain' | 'cover' */
+  resizeMode?: 'stretch' | 'contain' | 'cover';
 }
 
 // ============================================================================
@@ -50,6 +75,7 @@ interface BikeAnimationProps {
  * 
  * Renders a cycling animation that responds to real-time speed data.
  * The animation uses a sequence of PNG images to create a smooth cycling effect.
+ * Enhanced with liquid glass effects and dynamic glassmorphism.
  * 
  * @param props - Component properties
  * @param props.speed - Current cycling speed (affects animation speed)
@@ -69,275 +95,102 @@ interface BikeAnimationProps {
  */
 const BikeAnimation: React.FC<BikeAnimationProps> = ({ 
   speed, 
-  isConnected: _isConnected, 
+  isConnected, 
   gender = 'male',
-  onBluetoothPress
+  onBluetoothPress,
+  onMenuPress,
+  sessionGoalKm = 2
 }) => {
+  console.log("🎬 BikeAnimation received props:", { speed, isConnected, gender });
+  console.log("🧑‍🦱 BikeAnimation: Avatar gender received for animation:", gender);
+  
+  // Get BLE data for overlay display
+  const { currentDistance, currentCycles, currentSpeed, currentCalories, resetTrigger } = useBLE();
+  
+  // Get user profile for daily goal
+  const { userProfile } = useAuth();
+  
+  // Safe area insets to avoid system UI
+  const insets = useSafeAreaInsets();
+  
+  // Screen dimensions for landscape detection
+  const [screenDimensions, setScreenDimensions] = useState(Dimensions.get('window'));
+  const isLandscape = screenDimensions.width > screenDimensions.height;
+  const isSmallScreen = screenDimensions.width < 600 || screenDimensions.height < 400;
+  
+  // Calculate responsive container dimensions - maximize height in landscape, avoid navigation bars
+  const containerHeight = isLandscape 
+    ? screenDimensions.height - insets.top - insets.bottom // Full height minus safe areas in landscape
+    : 300; // Fixed height for portrait mode
+  
+  // Responsive positioning and sizing
+  const topIconsTop = isSmallScreen ? 20 : 32;
+  const topIconsRight = isSmallScreen ? 16 : 32;
+  const iconSize = isSmallScreen ? 36 : 44;
+
   // ============================================================================
-  // STATE MANAGEMENT
+  // ANIMATED VALUES FOR LIQUID GLASS EFFECTS
   // ============================================================================
 
-  /** Current frame index in the animation sequence */
-  const [currentEnvFrame, setCurrentEnvFrame] = useState(0);
+  /** Animated value for liquid glass opacity */
+  const liquidGlassOpacity = useRef(new Animated.Value(0)).current;
   
-  /** Animation frame rate - affects smoothness of animation */
-  const [_fps, setFps] = useState(60);
+  /** Animated value for speed-based liquid movement */
+  const liquidMovement = useRef(new Animated.Value(0)).current;
   
-  /** Reference to the current animation frame for cleanup */
-  const animFrameRef = useRef<number | null>(null);
+  /** Animated value for glass card scaling */
+  const glassCardScale = useRef(new Animated.Value(1)).current;
   
-  /** Timestamp of the last frame for frame rate calculation */
-  const lastTimeRef = useRef<number>(0);
+  // rotationTransition removed (unused)
+
+  // Simple session timer (HH:MM:SS) shown under the Bluetooth icon
+  const [elapsedMs, setElapsedMs] = useState(0);
+  const [_highscoreData, setHighscoreData] = useState({
+    distanceKm: 0,
+    caloriesKcal: 0,
+    badges: 0
+  });
+  // Time formatting moved into InlineStats
+  
 
   // ============================================================================
-  // IMAGE ASSETS - MALE SEQUENCE
+  // HIGHSCORE DATA FETCHING
   // ============================================================================
-
+  
   /**
-   * Array of male cycling animation frames
-   * Each frame is a PNG image showing a different phase of the cycling motion
-   * Total of 113 frames for smooth animation
+   * Fetch highscore data from sessions table
    */
-  const maleFrameImages = useMemo(() => [
-    require('../../assets/images/CombinedMale/NewLevelSequence.0001000.png'),
-    require('../../assets/images/CombinedMale/NewLevelSequence.0001001.png'),
-    require('../../assets/images/CombinedMale/NewLevelSequence.0001002.png'),
-    require('../../assets/images/CombinedMale/NewLevelSequence.0001003.png'),
-    require('../../assets/images/CombinedMale/NewLevelSequence.0001004.png'),
-    require('../../assets/images/CombinedMale/NewLevelSequence.0001005.png'),
-    require('../../assets/images/CombinedMale/NewLevelSequence.0001006.png'),
-    require('../../assets/images/CombinedMale/NewLevelSequence.0001007.png'),
-    require('../../assets/images/CombinedMale/NewLevelSequence.0001008.png'),
-    require('../../assets/images/CombinedMale/NewLevelSequence.0001009.png'),
-    require('../../assets/images/CombinedMale/NewLevelSequence.0001010.png'),
-    require('../../assets/images/CombinedMale/NewLevelSequence.0001011.png'),
-    require('../../assets/images/CombinedMale/NewLevelSequence.0001012.png'),
-    require('../../assets/images/CombinedMale/NewLevelSequence.0001013.png'),
-    require('../../assets/images/CombinedMale/NewLevelSequence.0001014.png'),
-    require('../../assets/images/CombinedMale/NewLevelSequence.0001015.png'),
-    require('../../assets/images/CombinedMale/NewLevelSequence.0001016.png'),
-    require('../../assets/images/CombinedMale/NewLevelSequence.0001017.png'),
-    require('../../assets/images/CombinedMale/NewLevelSequence.0001018.png'),
-    require('../../assets/images/CombinedMale/NewLevelSequence.0001019.png'),
-    require('../../assets/images/CombinedMale/NewLevelSequence.0001020.png'),
-    require('../../assets/images/CombinedMale/NewLevelSequence.0001021.png'),
-    require('../../assets/images/CombinedMale/NewLevelSequence.0001022.png'),
-    require('../../assets/images/CombinedMale/NewLevelSequence.0001023.png'),
-    require('../../assets/images/CombinedMale/NewLevelSequence.0001024.png'),
-    require('../../assets/images/CombinedMale/NewLevelSequence.0001025.png'),
-    require('../../assets/images/CombinedMale/NewLevelSequence.0001026.png'),
-    require('../../assets/images/CombinedMale/NewLevelSequence.0001027.png'),
-    require('../../assets/images/CombinedMale/NewLevelSequence.0001028.png'),
-    require('../../assets/images/CombinedMale/NewLevelSequence.0001029.png'),
-    require('../../assets/images/CombinedMale/NewLevelSequence.0001030.png'),
-    require('../../assets/images/CombinedMale/NewLevelSequence.0001031.png'),
-    require('../../assets/images/CombinedMale/NewLevelSequence.0001032.png'),
-    require('../../assets/images/CombinedMale/NewLevelSequence.0001033.png'),
-    require('../../assets/images/CombinedMale/NewLevelSequence.0001034.png'),
-    require('../../assets/images/CombinedMale/NewLevelSequence.0001035.png'),
-    require('../../assets/images/CombinedMale/NewLevelSequence.0001036.png'),
-    require('../../assets/images/CombinedMale/NewLevelSequence.0001037.png'),
-    require('../../assets/images/CombinedMale/NewLevelSequence.0001038.png'),
-    require('../../assets/images/CombinedMale/NewLevelSequence.0001039.png'),
-    require('../../assets/images/CombinedMale/NewLevelSequence.0001040.png'),
-    require('../../assets/images/CombinedMale/NewLevelSequence.0001041.png'),
-    require('../../assets/images/CombinedMale/NewLevelSequence.0001042.png'),
-    require('../../assets/images/CombinedMale/NewLevelSequence.0001043.png'),
-    require('../../assets/images/CombinedMale/NewLevelSequence.0001044.png'),
-    require('../../assets/images/CombinedMale/NewLevelSequence.0001045.png'),
-    require('../../assets/images/CombinedMale/NewLevelSequence.0001046.png'),
-    require('../../assets/images/CombinedMale/NewLevelSequence.0001047.png'),
-    require('../../assets/images/CombinedMale/NewLevelSequence.0001048.png'),
-    require('../../assets/images/CombinedMale/NewLevelSequence.0001049.png'),
-    require('../../assets/images/CombinedMale/NewLevelSequence.0001050.png'),
-    require('../../assets/images/CombinedMale/NewLevelSequence.0001051.png'),
-    require('../../assets/images/CombinedMale/NewLevelSequence.0001052.png'),
-    require('../../assets/images/CombinedMale/NewLevelSequence.0001053.png'),
-    require('../../assets/images/CombinedMale/NewLevelSequence.0001054.png'),
-    require('../../assets/images/CombinedMale/NewLevelSequence.0001055.png'),
-    require('../../assets/images/CombinedMale/NewLevelSequence.0001056.png'),
-    require('../../assets/images/CombinedMale/NewLevelSequence.0001057.png'),
-    require('../../assets/images/CombinedMale/NewLevelSequence.0001058.png'),
-    require('../../assets/images/CombinedMale/NewLevelSequence.0001059.png'),
-    require('../../assets/images/CombinedMale/NewLevelSequence.0001060.png'),
-    require('../../assets/images/CombinedMale/NewLevelSequence.0001061.png'),
-    require('../../assets/images/CombinedMale/NewLevelSequence.0001062.png'),
-    require('../../assets/images/CombinedMale/NewLevelSequence.0001063.png'),
-    require('../../assets/images/CombinedMale/NewLevelSequence.0001064.png'),
-    require('../../assets/images/CombinedMale/NewLevelSequence.0001065.png'),
-    require('../../assets/images/CombinedMale/NewLevelSequence.0001066.png'),
-    require('../../assets/images/CombinedMale/NewLevelSequence.0001067.png'),
-    require('../../assets/images/CombinedMale/NewLevelSequence.0001068.png'),
-    require('../../assets/images/CombinedMale/NewLevelSequence.0001069.png'),
-    require('../../assets/images/CombinedMale/NewLevelSequence.0001070.png'),
-    require('../../assets/images/CombinedMale/NewLevelSequence.0001071.png'),
-    require('../../assets/images/CombinedMale/NewLevelSequence.0001072.png'),
-    require('../../assets/images/CombinedMale/NewLevelSequence.0001073.png'),
-    require('../../assets/images/CombinedMale/NewLevelSequence.0001074.png'),
-    require('../../assets/images/CombinedMale/NewLevelSequence.0001075.png'),
-    require('../../assets/images/CombinedMale/NewLevelSequence.0001076.png'),
-    require('../../assets/images/CombinedMale/NewLevelSequence.0001077.png'),
-    require('../../assets/images/CombinedMale/NewLevelSequence.0001078.png'),
-    require('../../assets/images/CombinedMale/NewLevelSequence.0001079.png'),
-    require('../../assets/images/CombinedMale/NewLevelSequence.0001080.png'),
-    require('../../assets/images/CombinedMale/NewLevelSequence.0001081.png'),
-    require('../../assets/images/CombinedMale/NewLevelSequence.0001082.png'),
-    require('../../assets/images/CombinedMale/NewLevelSequence.0001083.png'),
-    require('../../assets/images/CombinedMale/NewLevelSequence.0001084.png'),
-    require('../../assets/images/CombinedMale/NewLevelSequence.0001085.png'),
-    require('../../assets/images/CombinedMale/NewLevelSequence.0001086.png'),
-    require('../../assets/images/CombinedMale/NewLevelSequence.0001087.png'),
-    require('../../assets/images/CombinedMale/NewLevelSequence.0001088.png'),
-    require('../../assets/images/CombinedMale/NewLevelSequence.0001089.png'),
-    require('../../assets/images/CombinedMale/NewLevelSequence.0001090.png'),
-    require('../../assets/images/CombinedMale/NewLevelSequence.0001091.png'),
-    require('../../assets/images/CombinedMale/NewLevelSequence.0001092.png'),
-    require('../../assets/images/CombinedMale/NewLevelSequence.0001093.png'),
-    require('../../assets/images/CombinedMale/NewLevelSequence.0001094.png'),
-    require('../../assets/images/CombinedMale/NewLevelSequence.0001095.png'),
-    require('../../assets/images/CombinedMale/NewLevelSequence.0001096.png'),
-    require('../../assets/images/CombinedMale/NewLevelSequence.0001097.png'),
-    require('../../assets/images/CombinedMale/NewLevelSequence.0001098.png'),
-    require('../../assets/images/CombinedMale/NewLevelSequence.0001099.png'),
-    require('../../assets/images/CombinedMale/NewLevelSequence.0001100.png'),
-    require('../../assets/images/CombinedMale/NewLevelSequence.0001101.png'),
-    require('../../assets/images/CombinedMale/NewLevelSequence.0001102.png'),
-    require('../../assets/images/CombinedMale/NewLevelSequence.0001103.png'),
-    require('../../assets/images/CombinedMale/NewLevelSequence.0001104.png'),
-    require('../../assets/images/CombinedMale/NewLevelSequence.0001105.png'),
-    require('../../assets/images/CombinedMale/NewLevelSequence.0001106.png'),
-    require('../../assets/images/CombinedMale/NewLevelSequence.0001107.png'),
-    require('../../assets/images/CombinedMale/NewLevelSequence.0001108.png'),
-    require('../../assets/images/CombinedMale/NewLevelSequence.0001109.png'),
-    require('../../assets/images/CombinedMale/NewLevelSequence.0001110.png'),
-    require('../../assets/images/CombinedMale/NewLevelSequence.0001111.png'),
-    require('../../assets/images/CombinedMale/NewLevelSequence.0001112.png'),
-  ], []);
+  const fetchHighscoreData = async () => {
+    try {
+      console.log('[HIGHSCORE] 🏆 Fetching highscore data...');
+      
+      // Get top users by distance to find the highest distance
+      const topUsers = await LeaderboardService.getTopUsers('distance', 1);
+      
+      if (topUsers.length > 0) {
+        const topUser = topUsers[0];
+        setHighscoreData({
+          distanceKm: topUser.total_distance,
+          caloriesKcal: topUser.total_calories,
+          badges: topUser.total_sessions, // Using session count as badge count for now
+        });
+        console.log('[HIGHSCORE] ✅ Highscore data loaded:', {
+          distance: topUser.total_distance,
+          calories: topUser.total_calories,
+          sessions: topUser.total_sessions,
+        });
+      } else {
+        console.log('[HIGHSCORE] ℹ️ No highscore data found');
+      }
+    } catch (error) {
+      console.error('[HIGHSCORE] ❌ Failed to fetch highscore data:', error);
+    }
+  };
 
   // ============================================================================
-  // IMAGE ASSETS - FEMALE SEQUENCE
+  // NOTE: Image assets are handled by the native Android component
+  // PNG sequences are loaded directly from android/app/src/main/assets/images/
   // ============================================================================
-
-  /**
-   * Array of female cycling animation frames
-   * Each frame is a PNG image showing a different phase of the cycling motion
-   * Total of 113 frames for smooth animation
-   */
-  const femaleFrameImages = useMemo(() => [
-    require('../../assets/images/CombinedFemale/NewLevelSequence.0001000.png'),
-    require('../../assets/images/CombinedFemale/NewLevelSequence.0001001.png'),
-    require('../../assets/images/CombinedFemale/NewLevelSequence.0001002.png'),
-    require('../../assets/images/CombinedFemale/NewLevelSequence.0001003.png'),
-    require('../../assets/images/CombinedFemale/NewLevelSequence.0001004.png'),
-    require('../../assets/images/CombinedFemale/NewLevelSequence.0001005.png'),
-    require('../../assets/images/CombinedFemale/NewLevelSequence.0001006.png'),
-    require('../../assets/images/CombinedFemale/NewLevelSequence.0001007.png'),
-    require('../../assets/images/CombinedFemale/NewLevelSequence.0001008.png'),
-    require('../../assets/images/CombinedFemale/NewLevelSequence.0001009.png'),
-    require('../../assets/images/CombinedFemale/NewLevelSequence.0001010.png'),
-    require('../../assets/images/CombinedFemale/NewLevelSequence.0001011.png'),
-    require('../../assets/images/CombinedFemale/NewLevelSequence.0001012.png'),
-    require('../../assets/images/CombinedFemale/NewLevelSequence.0001013.png'),
-    require('../../assets/images/CombinedFemale/NewLevelSequence.0001014.png'),
-    require('../../assets/images/CombinedFemale/NewLevelSequence.0001015.png'),
-    require('../../assets/images/CombinedFemale/NewLevelSequence.0001016.png'),
-    require('../../assets/images/CombinedFemale/NewLevelSequence.0001017.png'),
-    require('../../assets/images/CombinedFemale/NewLevelSequence.0001018.png'),
-    require('../../assets/images/CombinedFemale/NewLevelSequence.0001019.png'),
-    require('../../assets/images/CombinedFemale/NewLevelSequence.0001020.png'),
-    require('../../assets/images/CombinedFemale/NewLevelSequence.0001021.png'),
-    require('../../assets/images/CombinedFemale/NewLevelSequence.0001022.png'),
-    require('../../assets/images/CombinedFemale/NewLevelSequence.0001023.png'),
-    require('../../assets/images/CombinedFemale/NewLevelSequence.0001024.png'),
-    require('../../assets/images/CombinedFemale/NewLevelSequence.0001025.png'),
-    require('../../assets/images/CombinedFemale/NewLevelSequence.0001026.png'),
-    require('../../assets/images/CombinedFemale/NewLevelSequence.0001027.png'),
-    require('../../assets/images/CombinedFemale/NewLevelSequence.0001028.png'),
-    require('../../assets/images/CombinedFemale/NewLevelSequence.0001029.png'),
-    require('../../assets/images/CombinedFemale/NewLevelSequence.0001030.png'),
-    require('../../assets/images/CombinedFemale/NewLevelSequence.0001031.png'),
-    require('../../assets/images/CombinedFemale/NewLevelSequence.0001032.png'),
-    require('../../assets/images/CombinedFemale/NewLevelSequence.0001033.png'),
-    require('../../assets/images/CombinedFemale/NewLevelSequence.0001034.png'),
-    require('../../assets/images/CombinedFemale/NewLevelSequence.0001035.png'),
-    require('../../assets/images/CombinedFemale/NewLevelSequence.0001036.png'),
-    require('../../assets/images/CombinedFemale/NewLevelSequence.0001037.png'),
-    require('../../assets/images/CombinedFemale/NewLevelSequence.0001038.png'),
-    require('../../assets/images/CombinedFemale/NewLevelSequence.0001039.png'),
-    require('../../assets/images/CombinedFemale/NewLevelSequence.0001040.png'),
-    require('../../assets/images/CombinedFemale/NewLevelSequence.0001041.png'),
-    require('../../assets/images/CombinedFemale/NewLevelSequence.0001042.png'),
-    require('../../assets/images/CombinedFemale/NewLevelSequence.0001043.png'),
-    require('../../assets/images/CombinedFemale/NewLevelSequence.0001044.png'),
-    require('../../assets/images/CombinedFemale/NewLevelSequence.0001045.png'),
-    require('../../assets/images/CombinedFemale/NewLevelSequence.0001046.png'),
-    require('../../assets/images/CombinedFemale/NewLevelSequence.0001047.png'),
-    require('../../assets/images/CombinedFemale/NewLevelSequence.0001048.png'),
-    require('../../assets/images/CombinedFemale/NewLevelSequence.0001049.png'),
-    require('../../assets/images/CombinedFemale/NewLevelSequence.0001050.png'),
-    require('../../assets/images/CombinedFemale/NewLevelSequence.0001051.png'),
-    require('../../assets/images/CombinedFemale/NewLevelSequence.0001052.png'),
-    require('../../assets/images/CombinedFemale/NewLevelSequence.0001053.png'),
-    require('../../assets/images/CombinedFemale/NewLevelSequence.0001054.png'),
-    require('../../assets/images/CombinedFemale/NewLevelSequence.0001055.png'),
-    require('../../assets/images/CombinedFemale/NewLevelSequence.0001056.png'),
-    require('../../assets/images/CombinedFemale/NewLevelSequence.0001057.png'),
-    require('../../assets/images/CombinedFemale/NewLevelSequence.0001058.png'),
-    require('../../assets/images/CombinedFemale/NewLevelSequence.0001059.png'),
-    require('../../assets/images/CombinedFemale/NewLevelSequence.0001060.png'),
-    require('../../assets/images/CombinedFemale/NewLevelSequence.0001061.png'),
-    require('../../assets/images/CombinedFemale/NewLevelSequence.0001062.png'),
-    require('../../assets/images/CombinedFemale/NewLevelSequence.0001063.png'),
-    require('../../assets/images/CombinedFemale/NewLevelSequence.0001064.png'),
-    require('../../assets/images/CombinedFemale/NewLevelSequence.0001065.png'),
-    require('../../assets/images/CombinedFemale/NewLevelSequence.0001066.png'),
-    require('../../assets/images/CombinedFemale/NewLevelSequence.0001067.png'),
-    require('../../assets/images/CombinedFemale/NewLevelSequence.0001068.png'),
-    require('../../assets/images/CombinedFemale/NewLevelSequence.0001069.png'),
-    require('../../assets/images/CombinedFemale/NewLevelSequence.0001070.png'),
-    require('../../assets/images/CombinedFemale/NewLevelSequence.0001071.png'),
-    require('../../assets/images/CombinedFemale/NewLevelSequence.0001072.png'),
-    require('../../assets/images/CombinedFemale/NewLevelSequence.0001073.png'),
-    require('../../assets/images/CombinedFemale/NewLevelSequence.0001074.png'),
-    require('../../assets/images/CombinedFemale/NewLevelSequence.0001075.png'),
-    require('../../assets/images/CombinedFemale/NewLevelSequence.0001076.png'),
-    require('../../assets/images/CombinedFemale/NewLevelSequence.0001077.png'),
-    require('../../assets/images/CombinedFemale/NewLevelSequence.0001078.png'),
-    require('../../assets/images/CombinedFemale/NewLevelSequence.0001079.png'),
-    require('../../assets/images/CombinedFemale/NewLevelSequence.0001080.png'),
-    require('../../assets/images/CombinedFemale/NewLevelSequence.0001081.png'),
-    require('../../assets/images/CombinedFemale/NewLevelSequence.0001082.png'),
-    require('../../assets/images/CombinedFemale/NewLevelSequence.0001083.png'),
-    require('../../assets/images/CombinedFemale/NewLevelSequence.0001084.png'),
-    require('../../assets/images/CombinedFemale/NewLevelSequence.0001085.png'),
-    require('../../assets/images/CombinedFemale/NewLevelSequence.0001086.png'),
-    require('../../assets/images/CombinedFemale/NewLevelSequence.0001087.png'),
-    require('../../assets/images/CombinedFemale/NewLevelSequence.0001088.png'),
-    require('../../assets/images/CombinedFemale/NewLevelSequence.0001089.png'),
-    require('../../assets/images/CombinedFemale/NewLevelSequence.0001090.png'),
-    require('../../assets/images/CombinedFemale/NewLevelSequence.0001091.png'),
-    require('../../assets/images/CombinedFemale/NewLevelSequence.0001092.png'),
-    require('../../assets/images/CombinedFemale/NewLevelSequence.0001093.png'),
-    require('../../assets/images/CombinedFemale/NewLevelSequence.0001094.png'),
-    require('../../assets/images/CombinedFemale/NewLevelSequence.0001095.png'),
-    require('../../assets/images/CombinedFemale/NewLevelSequence.0001096.png'),
-    require('../../assets/images/CombinedFemale/NewLevelSequence.0001097.png'),
-    require('../../assets/images/CombinedFemale/NewLevelSequence.0001098.png'),
-    require('../../assets/images/CombinedFemale/NewLevelSequence.0001099.png'),
-    require('../../assets/images/CombinedFemale/NewLevelSequence.0001100.png'),
-    require('../../assets/images/CombinedFemale/NewLevelSequence.0001101.png'),
-    require('../../assets/images/CombinedFemale/NewLevelSequence.0001102.png'),
-    require('../../assets/images/CombinedFemale/NewLevelSequence.0001103.png'),
-    require('../../assets/images/CombinedFemale/NewLevelSequence.0001104.png'),
-    require('../../assets/images/CombinedFemale/NewLevelSequence.0001105.png'),
-    require('../../assets/images/CombinedFemale/NewLevelSequence.0001106.png'),
-    require('../../assets/images/CombinedFemale/NewLevelSequence.0001107.png'),
-    require('../../assets/images/CombinedFemale/NewLevelSequence.0001108.png'),
-    require('../../assets/images/CombinedFemale/NewLevelSequence.0001109.png'),
-    require('../../assets/images/CombinedFemale/NewLevelSequence.0001110.png'),
-    require('../../assets/images/CombinedFemale/NewLevelSequence.0001111.png'),
-    require('../../assets/images/CombinedFemale/NewLevelSequence.0001112.png'),
-  ], []);
 
   // ============================================================================
   // COMPUTED VALUES
@@ -346,125 +199,174 @@ const BikeAnimation: React.FC<BikeAnimationProps> = ({
   /**
    * Selects the appropriate frame sequence based on gender
    * Returns either male or female animation frames
+   * Note: This is handled by the native Android component
    */
-  const frameImages = useMemo(() => {
-    return gender === 'female' ? femaleFrameImages : maleFrameImages;
-  }, [gender, femaleFrameImages, maleFrameImages]);
+  // const _frameImages = useMemo(() => {
+  //   return gender === 'female' ? femaleFrameImages : maleFrameImages;
+  // }, [gender, femaleFrameImages, maleFrameImages]);
 
-  /**
-   * Gets the current animation frame image
-   * Uses modulo to loop through the frame sequence
-   */
-  const currentFrameImage = useMemo(() => {
-    return frameImages[currentEnvFrame % frameImages.length];
-  }, [currentEnvFrame, frameImages]);
+
+  // removed unused width from useWindowDimensions
+
+
+  // Rotation transition removed - BikeAnimation is now simple
 
   // ============================================================================
-  // ANIMATION LOGIC
+  // SIMPLE EFFECTS
   // ============================================================================
 
   /**
-   * Calculates the target frame rate based on current speed
-   * Higher speeds result in faster animation
-   * 
-   * @param currentSpeed - Current cycling speed in km/h
-   * @returns Target frame rate for animation
+   * Screen orientation handler
    */
-  const calculateTargetFPS = useCallback((currentSpeed: number): number => {
-    // Base frame rate when speed is 0
-    const baseFPS = 30;
-    
-    // Maximum frame rate at high speeds
-    const maxFPS = 60;
-    
-    // Speed threshold for maximum frame rate
-    const maxSpeedThreshold = 30;
-    
-    if (currentSpeed <= 0) {
-      return baseFPS;
+  useEffect(() => {
+    const subscription = Dimensions.addEventListener('change', ({ window }) => {
+      setScreenDimensions(window);
+    });
+    return () => subscription?.remove();
+  }, []);
+
+  // Drive timer based on connection state - only counts when speed > 0.00
+  useEffect(() => {
+    let interval: ReturnType<typeof setInterval> | undefined;
+    if (isConnected) {
+      interval = setInterval(() => {
+        // Only increment timer if speed is greater than 0.00
+        if (currentSpeed > 0.00) {
+          setElapsedMs((prev) => prev + 1000);
+          console.log('⏱️ BikeAnimation Timer counting - Speed:', currentSpeed, 'km/h');
+        } else {
+          console.log('⏸️ BikeAnimation Timer paused - Speed:', currentSpeed, 'km/h');
+        }
+      }, 1000);
+    } else {
+      setElapsedMs(0);
     }
-    
-    // Linear interpolation between base and max FPS
-    const fpsRatio = Math.min(currentSpeed / maxSpeedThreshold, 1);
-    return Math.round(baseFPS + (maxFPS - baseFPS) * fpsRatio);
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [isConnected, currentSpeed]);
+
+  /**
+   * Effect to reset timer when session is reset
+   */
+  useEffect(() => {
+    if (resetTrigger > 0) {
+      setElapsedMs(0);
+      console.log('⏱️ BikeAnimation Timer reset due to session reset');
+    }
+  }, [resetTrigger]);
+
+  // Fetch highscore data on component mount
+  useEffect(() => {
+    fetchHighscoreData();
   }, []);
 
   /**
-   * Main animation loop using requestAnimationFrame
-   * Updates the current frame based on speed and time
-   */
-  const animate = useCallback(() => {
-    const currentTime = Date.now();
-    const deltaTime = currentTime - lastTimeRef.current;
-    
-    // Calculate target FPS based on current speed
-    const targetFPS = calculateTargetFPS(speed);
-    const frameInterval = 1000 / targetFPS;
-    
-    // Update frame if enough time has passed
-    if (deltaTime >= frameInterval) {
-      setCurrentEnvFrame(prev => prev + 1);
-      lastTimeRef.current = currentTime;
-    }
-    
-    // Continue animation loop
-    animFrameRef.current = requestAnimationFrame(animate);
-  }, [speed, calculateTargetFPS]);
-
-  // ============================================================================
-  // EFFECTS
-  // ============================================================================
-
-  /**
-   * Starts and stops the animation loop
-   * Animation runs continuously while component is mounted
+   * Liquid glass effects when speed prop changes
    */
   useEffect(() => {
-    // Start animation loop
-    animFrameRef.current = requestAnimationFrame(animate);
+    const speedFactor = speed / 10;
+    const movementRange = speedFactor * 50;
     
-    // Cleanup function to stop animation
-    return () => {
-      if (animFrameRef.current) {
-        cancelAnimationFrame(animFrameRef.current);
-        animFrameRef.current = null;
-      }
-    };
-  }, [animate]);
-
-  /**
-   * Updates frame rate when speed changes
-   * Ensures smooth animation transitions
-   */
-  useEffect(() => {
-    const newFPS = calculateTargetFPS(speed);
-    setFps(newFPS);
-  }, [speed, calculateTargetFPS]);
+    Animated.parallel([
+      Animated.timing(liquidMovement, {
+        toValue: movementRange,
+        duration: 1000,
+        useNativeDriver: true,
+      }),
+      Animated.timing(liquidGlassOpacity, {
+        toValue: 0.8 + (speedFactor * 0.2),
+        duration: 800,
+        useNativeDriver: true,
+      }),
+      Animated.spring(glassCardScale, {
+        toValue: 1 + (speedFactor * 0.05),
+        tension: 100,
+        friction: 8,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [speed, liquidMovement, liquidGlassOpacity, glassCardScale]);
 
   // ============================================================================
   // RENDER
   // ============================================================================
 
   return (
-    <View style={styles.container}>
-      {/* Main animation image */}
-      <Image
-        source={currentFrameImage}
-        style={styles.animationImage}
-        resizeMode="stretch"
+    <View style={[styles.container, { height: containerHeight }]}>
+      <NativeBikeAnimation
+        speed={speed}
+        isConnected={isConnected}
+        gender={gender}
+        rpm={0}
+        distance={0}
+        calories={0}
+        resizeMode={isLandscape ? 'cover' : 'cover'}
+        style={styles.nativeAnimation}
       />
-      
-      {/* Bluetooth connection indicator */}
-      <TouchableOpacity 
-        style={styles.bluetoothIcon} 
-        onPress={onBluetoothPress}
-        activeOpacity={0.7}
+
+      {/* Top-right icons row: Bluetooth + dots (dots on the right) */}
+      <View 
+        style={[
+          styles.topIconsRow,
+          {
+            top: topIconsTop,
+            right: topIconsRight,
+          }
+        ]}
+        pointerEvents="box-none"
       >
-        <Image
-          source={require('../../assets/icons/bluetooth.png')}
-          style={styles.bluetoothIconImage}
+        <TouchableOpacity 
+          style={[styles.bluetoothIcon, { width: iconSize, height: iconSize }]} 
+          onPress={onBluetoothPress}
+          activeOpacity={0.7}
+        >
+          <Image
+            source={require('../../assets/icons/bluetooth.png')}
+            style={[
+              styles.bluetoothIconImage,
+              { width: iconSize * 0.5, height: iconSize * 0.5 }
+            ]}
+          />
+        </TouchableOpacity>
+
+        <TouchableOpacity 
+          style={[styles.menuIcon, { width: iconSize, height: iconSize }]} 
+          onPress={onMenuPress}
+          activeOpacity={0.7}
+        >
+          <Image
+            source={require('../../assets/icons/dots.png')}
+            style={[
+              styles.dotsIconImage,
+              { width: iconSize * 0.3, height: iconSize * 0.3 }
+            ]}
+          />
+        </TouchableOpacity>
+      </View>
+
+      {/* Inline stats (no card) under the Bluetooth icon - landscape only */}
+      {isLandscape && (
+        <View style={styles.inlineStatsRow}>
+          <InlineStats elapsedMs={elapsedMs} cycles={currentCycles ?? 0} caloriesKcal={currentCalories} />
+        </View>
+      )}
+
+      {/* Landscape Metrics Overlay */}
+      {isLandscape && (
+        <LandscapeMetricsOverlay
+          distance={currentDistance ?? 0}
+          speed={speed}
+          isConnected={isConnected}
+          sessionGoalKm={sessionGoalKm}
+          dailyGoalKm={userProfile?.daily_goal_calories ? userProfile.daily_goal_calories / 40 : 5}
         />
-      </TouchableOpacity>
+      )}
+
+      {/* Highscore card - landscape mode only (portrait mode has it in HomeScreen) */}
+      {isLandscape && (
+        <HighscoreCard />
+      )}
     </View>
   );
 };
@@ -476,13 +378,13 @@ const BikeAnimation: React.FC<BikeAnimationProps> = ({
 const styles = StyleSheet.create({
   /**
    * Main container for the bike animation
-   * Takes 40% of screen height and full width
+   * Responsive height based on orientation
    */
   container: {
     width: '100%',
-    height: height * 0.4, // 40% of screen height
     backgroundColor: '#FFFFFF', // White background
     position: 'relative', // For absolute positioning of Bluetooth icon
+    paddingTop: 20, // Add top padding to prevent animation from being covered
   },
   
   /**
@@ -494,26 +396,48 @@ const styles = StyleSheet.create({
     height: '100%',
     resizeMode: 'stretch', // Stretches to fill container
   },
+
+  /**
+   * Native animation view
+   * Covers the full container for native rendering
+   */
+  nativeAnimation: {
+    width: '100%',
+    height: '100%',
+  },
   
   /**
    * Bluetooth icon container
    * Positioned in top-right corner of animation
    */
-  bluetoothIcon: {
+  topIconsRow: {
     position: 'absolute',
-    top: 20,
-    right: 20,
-    width: 40,
-    height: 40,
-    backgroundColor: '#20A446', // Green background
-    borderRadius: 20,
+    top: 32,
+    right: 32,
+    flexDirection: 'row',
+    alignItems: 'center',
+    zIndex: 9999, // Very high z-index to ensure buttons are above everything
+    elevation: 10, // Android elevation to ensure buttons are above everything
+  },
+
+  bluetoothIcon: {
+    width: 44, // Larger touch target
+    height: 44,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
+    zIndex: 10000, // Very high z-index to ensure it's above everything
+  },
+
+  /**
+   * Menu icon container
+   */
+  menuIcon: {
+    width: 44, // Larger touch target
+    height: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 8,
+    zIndex: 10000, // Very high z-index to ensure it's above everything
   },
   
   /**
@@ -523,7 +447,253 @@ const styles = StyleSheet.create({
   bluetoothIconImage: {
     width: 24,
     height: 24,
-    tintColor: '#FFFFFF', // White tint
+    tintColor: '#000000',
+  },
+
+  /**
+   * Inline stats row (top-right, under Bluetooth)
+   */
+  inlineStatsRow: {
+    position: 'absolute',
+    top: 66, // slightly closer under icons
+    right: 32,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'flex-end',
+    zIndex: 1000,
+  },
+
+
+  /**
+   * Dots icon image placed left of Bluetooth
+   */
+  dotsIconImage: {
+    marginLeft: 8,
+    width: 12,
+    height: 12,
+    tintColor: '#000000',
+    resizeMode: 'contain',
+  },
+
+  /**
+   * Landscape metrics overlay (top right)
+   */
+  landscapeMetrics: {
+    position: 'absolute',
+    top: 20,
+    right: 80, // Space for bluetooth button
+    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+
+  /**
+   * Metric card for landscape
+   */
+  metricCard: {
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+
+  /**
+   * Metric value text
+   */
+  metricValue: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+  },
+
+  /**
+   * Metric unit text
+   */
+  metricUnit: {
+    fontSize: 12,
+    color: '#20A446',
+    fontWeight: '600',
+    marginTop: 2,
+  },
+
+  /**
+   * Metric label text
+   */
+  metricLabel: {
+    fontSize: 10,
+    color: '#CCCCCC',
+    fontWeight: '600',
+    marginTop: 1,
+  },
+
+  // ============================================================================
+  // CLEAN METRICS OVERLAY STYLES
+  // ============================================================================
+
+  /**
+   * Main metrics overlay container
+   */
+  metricsOverlay: {
+    position: 'absolute',
+    top: 20,
+    left: 20,
+    right: 20,
+    bottom: 20,
+    justifyContent: 'space-between',
+    pointerEvents: 'box-none', // Allow touches to pass through to animation
+  },
+
+  /**
+   * Connection status indicator
+   */
+  connectionStatus: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    marginBottom: 10,
+  },
+
+  /**
+   * Status dot indicator
+   */
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: 6,
+  },
+
+  /**
+   * Connection status text
+   */
+  connectionText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+
+  /**
+   * Metric card base style
+   */
+  metricCardBase: {
+    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+    borderRadius: 16,
+    padding: 16,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+
+  /**
+   * Primary metric card (Speed)
+   */
+  primaryCard: {
+    alignSelf: 'center',
+    minWidth: 120,
+    marginBottom: 20,
+  },
+
+  /**
+   * Primary metric value (large)
+   */
+  primaryValue: {
+    fontSize: 36,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+    textAlign: 'center',
+  },
+
+  /**
+   * Primary metric unit
+   */
+  primaryUnit: {
+    fontSize: 16,
+    color: '#20A446',
+    fontWeight: '600',
+    marginTop: 4,
+  },
+
+  /**
+   * Primary metric label
+   */
+  primaryLabel: {
+    fontSize: 12,
+    color: '#CCCCCC',
+    fontWeight: '600',
+    marginTop: 2,
+    letterSpacing: 1,
+  },
+
+  /**
+   * Secondary metrics row
+   */
+  secondaryMetricsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignSelf: 'stretch',
+  },
+
+  /**
+   * Secondary metric card
+   */
+  secondaryCard: {
+    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+    borderRadius: 12,
+    padding: 12,
+    alignItems: 'center',
+    flex: 1,
+    marginHorizontal: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+
+  /**
+   * Secondary metric value
+   */
+  secondaryValue: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+    textAlign: 'center',
+  },
+
+  /**
+   * Secondary metric unit
+   */
+  secondaryUnit: {
+    fontSize: 12,
+    color: '#20A446',
+    fontWeight: '600',
+    marginTop: 2,
+  },
+
+  /**
+   * Secondary metric label
+   */
+  secondaryLabel: {
+    fontSize: 10,
+    color: '#CCCCCC',
+    fontWeight: '600',
+    marginTop: 2,
+    letterSpacing: 0.5,
+  },
+
+  /**
+   * Connected status dot (green)
+   */
+  connectedDot: {
+    backgroundColor: '#4CAF50',
+  },
+
+  /**
+   * Disconnected status dot (red)
+   */
+  disconnectedDot: {
+    backgroundColor: '#FF5722',
   },
 });
 

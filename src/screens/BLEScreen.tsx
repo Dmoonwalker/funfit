@@ -17,17 +17,18 @@
  * @since 2024
  */
 
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
   TouchableOpacity,
-  FlatList,
   StyleSheet,
-  ScrollView,
-  SafeAreaView,
   Alert,
+  Image,
+  useWindowDimensions,
+  Animated,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useBLE } from '../contexts/BLEContext';
 
 // ============================================================================
@@ -35,39 +36,25 @@ import { useBLE } from '../contexts/BLEContext';
 // ============================================================================
 
 /**
+ * Props for the BLEScreen component
+ */
+interface BLEScreenProps {
+  navigation: any;
+}
+
+/**
  * BLEScreen Component
  * 
- * Main interface for Bluetooth Low Energy device management and monitoring.
- * Provides device scanning, connection management, and real-time data display.
- * 
- * Features:
- * - Device discovery and scanning
- * - Connection management (connect/disconnect)
- * - Real-time characteristic value monitoring
- * - Cycling data summary display
- * - Permission management
- * 
- * @example
- * ```tsx
- * <BLEScreen />
- * ```
+ * Beautiful blue gradient interface for Bluetooth device connection.
+ * Features automatic detection of target device and clean connection UI.
  */
-const BLEScreen: React.FC = () => {
-  // ============================================================================
-  // BLE CONTEXT INTEGRATION
-  // ============================================================================
-
-  /** BLE context providing device management and data access */
+const BLEScreen: React.FC<BLEScreenProps> = ({ navigation: _navigation }) => {
   const {
     devices,
     isScanning,
     isConnected,
     connectedDevice,
     hasPermissions,
-    characteristicValues,
-    currentSpeed,
-    currentDistance,
-    currentCalories,
     startScan,
     stopScan,
     connectToDevice,
@@ -75,243 +62,531 @@ const BLEScreen: React.FC = () => {
     requestPermissions,
   } = useBLE();
 
-  // ============================================================================
-  // EVENT HANDLERS
-  // ============================================================================
+  // Get screen dimensions for responsive design
+  const { width, height } = useWindowDimensions();
+  const isLandscape = width > height;
+  const isSmallScreen = width < 400 || height < 600;
+
+  // Target device MAC address
+  const TARGET_DEVICE_MAC = "00:4B:12:35:0C:AE";
+  
+  // State for UI
+  const [isSearching, setIsSearching] = useState(false);
+  
+  // Animation for pulsing Bluetooth icon
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+  
+  // Find target device
+  const targetDevice = devices.find(device => 
+    device.id === TARGET_DEVICE_MAC || 
+    device.id.includes(TARGET_DEVICE_MAC.replace(/:/g, ''))
+  );
 
   /**
-   * Handles scan button press
-   * Toggles between starting and stopping device scanning
-   * 
-   * If currently scanning, stops the scan
-   * If not scanning, starts a new scan for devices
+   * Handle Turn On - starts scanning for devices
    */
-  const handleScan = async () => {
+  const handleTurnOn = async () => {
+    if (!hasPermissions) {
+      const granted = await requestPermissions();
+      if (!granted) {
+        Alert.alert(
+          'Permissions Required',
+          'Bluetooth permissions are required to scan for devices.',
+          [{ text: 'OK' }]
+        );
+        return;
+      }
+    }
+
+    setIsSearching(true);
+    await startScan();
+    
+    // Let the BLE service handle the timeout (2 minutes)
+    // The scan will auto-stop after 2 minutes in BLEService
+  };
+
+  // Direct connection feature removed
+
+  /**
+   * Handle Turn Off - disconnect and stop scanning
+   */
+  const handleTurnOff = async () => {
+    setIsSearching(false);
     if (isScanning) {
       stopScan();
-    } else {
-      await startScan();
     }
-  };
-
-  /**
-   * Handles device connection/disconnection
-   * 
-   * @param deviceId - Unique identifier of the target device
-   * 
-   * If device is already connected, disconnects from it
-   * If device is not connected, attempts to connect to it
-   */
-  const handleConnect = async (deviceId: string) => {
-    const device = devices.find(d => d.id === deviceId);
-    if (device?.isConnected) {
+    if (isConnected) {
       await disconnectDevice();
-    } else {
-      await connectToDevice(deviceId);
     }
   };
 
   /**
-   * Handles permission request
-   * Requests necessary Bluetooth permissions and shows alert if denied
-   * 
-   * Displays an alert to guide users to device settings if permissions
-   * are not granted
+   * Handle Connect to target device
    */
-  const handleRequestPermissions = async () => {
-    const granted = await requestPermissions();
-    if (!granted) {
-      Alert.alert(
-        'Permissions Required',
-        'Bluetooth permissions are required to use this feature. Please grant permissions in your device settings.',
-        [{ text: 'OK' }]
+  const handleConnectTarget = async () => {
+    if (targetDevice) {
+      await connectToDevice(targetDevice.id);
+    }
+  };
+
+  /**
+   * Handle Disconnect from target device
+   */
+  const handleDisconnectTarget = async () => {
+    await disconnectDevice();
+  };
+
+  // Pulsing animation for Bluetooth icon when searching
+  useEffect(() => {
+    if (isSearching || isScanning) {
+      // Start pulsing animation
+      const pulseAnimation = Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseAnim, {
+            toValue: 1.2,
+            duration: 800,
+            useNativeDriver: true,
+          }),
+          Animated.timing(pulseAnim, {
+            toValue: 1,
+            duration: 800,
+            useNativeDriver: true,
+          }),
+        ])
       );
+      pulseAnimation.start();
+      
+      return () => {
+        pulseAnimation.stop();
+        pulseAnim.setValue(1);
+      };
+    } else {
+      // Stop animation and reset to normal size
+      pulseAnim.setValue(1);
     }
-  };
+  }, [isSearching, isScanning, pulseAnim]);
 
-  // ============================================================================
-  // RENDER FUNCTIONS
-  // ============================================================================
-
-  /**
-   * Renders a single device item in the device list
-   * 
-   * @param item - Device object containing id, name, rssi, and connection status
-   * @returns JSX element for the device item
-   */
-  const renderDevice = ({ item }: { item: any }) => (
-    <View style={styles.deviceItem}>
-      <View style={styles.deviceInfo}>
-        <Text style={styles.deviceName}>
-          {item.name || `Device ${item.id.slice(-6)}`}
-        </Text>
-        <Text style={styles.deviceId}>{item.id}</Text>
-        {item.rssi && (
-          <Text style={styles.deviceRssi}>Signal: {item.rssi} dBm</Text>
-        )}
-      </View>
-      <TouchableOpacity
-        style={[
-          styles.connectButton,
-          item.isConnected && styles.disconnectButton
-        ]}
-        onPress={() => handleConnect(item.id)}
-      >
-        <Text style={styles.connectButtonText}>
-          {item.isConnected ? 'Disconnect' : 'Connect'}
-        </Text>
-      </TouchableOpacity>
-    </View>
-  );
-
-  /**
-   * Renders a single characteristic value item
-   * 
-   * @param item - Characteristic value object containing uuid, value, and metadata
-   * @returns JSX element for the characteristic value item
-   */
-  const renderCharacteristicValue = ({ item }: { item: any }) => (
-    <View style={styles.characteristicItem}>
-      <View style={styles.characteristicInfo}>
-        <Text style={styles.characteristicLabel}>
-          {item.userDescription || 'Unknown Characteristic'}
-        </Text>
-        <Text style={styles.characteristicUuid}>
-          UUID: {item.uuid}
-        </Text>
-        <Text style={styles.characteristicValue}>
-          Value: {item.value || 'No value'}
-        </Text>
-        <Text style={styles.characteristicTime}>
-          Updated: {item.lastUpdated.toLocaleTimeString()}
-        </Text>
-      </View>
-    </View>
-  );
-
-  // ============================================================================
-  // RENDER
-  // ============================================================================
+  // Log when target device is found (no auto-connect)
+  useEffect(() => {
+    if (targetDevice && !isConnected && !targetDevice.isConnected) {
+      console.log('🎯 Target device found:', targetDevice.id);
+    }
+  }, [targetDevice, isConnected]);
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView style={styles.scrollView}>
-        {/* Header Section */}
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Bluetooth Devices</Text>
-          <Text style={styles.headerSubtitle}>
-            {isScanning ? 'Scanning for devices...' : 'Ready to scan'}
-          </Text>
+      <View style={[
+        styles.content,
+        isLandscape && styles.landscapeContent
+      ]}>
+        {isLandscape ? (
+          // Landscape layout - side by side
+          <>
+            {/* Left side - Icon and status */}
+            <View style={styles.landscapeLeft}>
+              <Animated.View style={[
+                styles.bluetoothIconContainer,
+                { 
+                  width: isSmallScreen ? 60 : 80, 
+                  height: isSmallScreen ? 60 : 80,
+                  marginBottom: isSmallScreen ? 20 : 30,
+                  transform: [{ scale: pulseAnim }]
+                }
+              ]}>
+          <Image 
+            source={require('../../assets/icons/bluetooth.png')} 
+                  style={[
+                    styles.bluetoothIcon,
+                    { 
+                      width: isSmallScreen ? 30 : 40, 
+                      height: isSmallScreen ? 30 : 40 
+                    }
+                  ]}
+                />
+              </Animated.View>
+              
+              {targetDevice && (
+                <View style={styles.bikeIconContainer}>
+                  <Image 
+                    source={require('../../assets/icons/bike.png')} 
+                    style={[
+                      styles.bikeIcon,
+                      { 
+                        width: isSmallScreen ? 40 : 50, 
+                        height: isSmallScreen ? 40 : 50 
+                      }
+                    ]}
+                  />
+                  <Text style={[
+                    styles.deviceMacText,
+                    { fontSize: isSmallScreen ? 12 : 14 }
+                  ]}>
+                    {isConnected ? connectedDevice?.id : TARGET_DEVICE_MAC}
+                  </Text>
+                </View>
+              )}
         </View>
 
-        {/* Permissions Section */}
-        {!hasPermissions && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Permissions Required</Text>
-            <Text style={styles.sectionDescription}>
-              Bluetooth permissions are required to scan for and connect to devices.
-            </Text>
-            <TouchableOpacity
-              style={styles.permissionButton}
-              onPress={handleRequestPermissions}
-            >
-              <Text style={styles.permissionButtonText}>Grant Permissions</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
-        {/* Scan Control Section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Device Discovery</Text>
-          <TouchableOpacity
-            style={[styles.scanButton, isScanning && styles.scanningButton]}
-            onPress={handleScan}
-            disabled={!hasPermissions}
-          >
-            <Text style={styles.scanButtonText}>
-              {isScanning ? 'Stop Scan' : 'Start Scan'}
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Real-Time Cycling Data Summary */}
-        {isConnected && characteristicValues.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>
-              Real-Time Cycling Data ({characteristicValues.length} characteristics)
-            </Text>
-            <View style={styles.cyclingDataSummary}>
-              <View style={styles.dataCard}>
-                <Text style={styles.dataLabel}>Current Speed</Text>
-                <Text style={styles.dataValue}>{currentSpeed.toFixed(1)}</Text>
-                <Text style={styles.dataUnit}>Km/h</Text>
-              </View>
-              <View style={styles.dataCard}>
-                <Text style={styles.dataLabel}>Distance</Text>
-                <Text style={styles.dataValue}>{currentDistance.toFixed(1)}</Text>
-                <Text style={styles.dataUnit}>Km</Text>
-              </View>
-              <View style={styles.dataCard}>
-                <Text style={styles.dataLabel}>Calories</Text>
-                <Text style={styles.dataValue}>{currentCalories.toFixed(0)}</Text>
-                <Text style={styles.dataUnit}>cal</Text>
-              </View>
+            {/* Right side - Text and buttons */}
+            <View style={styles.landscapeRight}>
+        {!isConnected && !targetDevice && !isSearching ? (
+          // Initial state - Search
+          <>
+                  <Text style={[
+                    styles.title,
+                    { fontSize: isSmallScreen ? 24 : 28 }
+                  ]}>Connect</Text>
+                  <Text style={[
+                    styles.subtitle,
+                    { 
+                      fontSize: isSmallScreen ? 14 : 16,
+                      marginBottom: isSmallScreen ? 30 : 40
+                    }
+                  ]}>to your cycling device nearby</Text>
+                  
+                  <TouchableOpacity style={[
+                    styles.actionButton,
+                    { 
+                      paddingHorizontal: isSmallScreen ? 30 : 40,
+                      paddingVertical: isSmallScreen ? 14 : 18,
+                      minWidth: isSmallScreen ? 160 : 200
+                    }
+                  ]} onPress={handleTurnOn}>
+                    <Text style={[
+                      styles.actionButtonText,
+                      { fontSize: isSmallScreen ? 16 : 18 }
+                    ]}>Search</Text>
+                  </TouchableOpacity>
+          </>
+        ) : isSearching || isScanning ? (
+          // Searching state
+          <>
+                  <Text style={[
+                    styles.title,
+                    { fontSize: isSmallScreen ? 24 : 28 }
+                  ]}>Searching...</Text>
+                  <Text style={[
+                    styles.subtitle,
+                    { 
+                      fontSize: isSmallScreen ? 14 : 16,
+                      marginBottom: isSmallScreen ? 30 : 40
+                    }
+                  ]}>Looking for your cycling device</Text>
+                  
+                  <TouchableOpacity style={[
+                    styles.cancelButton,
+                    { 
+                      paddingHorizontal: isSmallScreen ? 30 : 40,
+                      paddingVertical: isSmallScreen ? 14 : 18,
+                      minWidth: isSmallScreen ? 160 : 200
+                    }
+                  ]} onPress={handleTurnOff}>
+                    <Text style={[
+                      styles.cancelButtonText,
+                      { fontSize: isSmallScreen ? 16 : 18 }
+                    ]}>Cancel</Text>
+                  </TouchableOpacity>
+                </>
+              ) : targetDevice && !isConnected ? (
+                // Target device found but not connected
+                <>
+                  <Text style={[
+                    styles.title,
+                    { fontSize: isSmallScreen ? 24 : 28 }
+                  ]}>Device Found</Text>
+                  <Text style={[
+                    styles.subtitle,
+                    { 
+                      fontSize: isSmallScreen ? 14 : 16,
+                      marginBottom: isSmallScreen ? 30 : 40
+                    }
+                  ]}>Your cycling device is ready to connect</Text>
+                  
+                  <TouchableOpacity style={[
+                    styles.actionButton,
+                    { 
+                      paddingHorizontal: isSmallScreen ? 30 : 40,
+                      paddingVertical: isSmallScreen ? 14 : 18,
+                      minWidth: isSmallScreen ? 160 : 200
+                    }
+                  ]} onPress={handleConnectTarget}>
+                    <Text style={[
+                      styles.actionButtonText,
+                      { fontSize: isSmallScreen ? 16 : 18 }
+                    ]}>Connect</Text>
+                  </TouchableOpacity>
+                </>
+              ) : isConnected && connectedDevice ? (
+                // Connected state
+                <>
+                  <Text style={[
+                    styles.title,
+                    { fontSize: isSmallScreen ? 24 : 28 }
+                  ]}>Connected</Text>
+                  <Text style={[
+                    styles.subtitle,
+                    { 
+                      fontSize: isSmallScreen ? 14 : 16,
+                      marginBottom: isSmallScreen ? 30 : 40
+                    }
+                  ]}>Your cycling device is ready to use</Text>
+                  
+                  <TouchableOpacity style={[
+                    styles.disconnectButton,
+                    { 
+                      paddingHorizontal: isSmallScreen ? 30 : 40,
+                      paddingVertical: isSmallScreen ? 14 : 18,
+                      minWidth: isSmallScreen ? 160 : 200
+                    }
+                  ]} onPress={handleDisconnectTarget}>
+                    <Text style={[
+                      styles.disconnectButtonText,
+                      { fontSize: isSmallScreen ? 16 : 18 }
+                    ]}>Disconnect</Text>
+                  </TouchableOpacity>
+                </>
+              ) : (
+                // Fallback state
+                <>
+                  <Text style={[
+                    styles.title,
+                    { fontSize: isSmallScreen ? 24 : 28 }
+                  ]}>Bluetooth</Text>
+                  <Text style={[
+                    styles.subtitle,
+                    { 
+                      fontSize: isSmallScreen ? 14 : 16,
+                      marginBottom: isSmallScreen ? 30 : 40
+                    }
+                  ]}>Manage your device connection</Text>
+                  
+                  <TouchableOpacity style={[
+                    styles.actionButton,
+                    { 
+                      paddingHorizontal: isSmallScreen ? 30 : 40,
+                      paddingVertical: isSmallScreen ? 14 : 18,
+                      minWidth: isSmallScreen ? 160 : 200
+                    }
+                  ]} onPress={handleTurnOn}>
+                    <Text style={[
+                      styles.actionButtonText,
+                      { fontSize: isSmallScreen ? 16 : 18 }
+                    ]}>Search</Text>
+                  </TouchableOpacity>
+                </>
+              )}
             </View>
-            <Text style={styles.subsectionTitle}>Raw Characteristic Data</Text>
-            <FlatList
-              data={characteristicValues}
-              renderItem={renderCharacteristicValue}
-              keyExtractor={(item) => item.uuid}
-              style={styles.list}
-              scrollEnabled={false}
-            />
-          </View>
-        )}
-
-        {/* Devices List Section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>
-            Available Devices ({devices.length})
-          </Text>
-          {devices.length === 0 ? (
-            <Text style={styles.noDevicesText}>
-              {isScanning 
-                ? 'Scanning for devices...' 
-                : 'No devices found. Start scanning to discover devices.'
+          </>
+        ) : (
+          // Portrait layout - original vertical layout
+          <>
+            {/* Bluetooth Icon */}
+            <Animated.View style={[
+              styles.bluetoothIconContainer,
+              { 
+                width: isSmallScreen ? 60 : 80, 
+                height: isSmallScreen ? 60 : 80,
+                marginBottom: isSmallScreen ? 30 : 40,
+                transform: [{ scale: pulseAnim }]
               }
-            </Text>
-          ) : (
-            <FlatList
-              data={devices}
-              renderItem={renderDevice}
-              keyExtractor={(item) => item.id}
-              style={styles.list}
-              scrollEnabled={false}
-            />
-          )}
-        </View>
+            ]}>
+              <Image 
+                source={require('../../assets/icons/bluetooth.png')} 
+                style={[
+                  styles.bluetoothIcon,
+                  { 
+                    width: isSmallScreen ? 30 : 40, 
+                    height: isSmallScreen ? 30 : 40 
+                  }
+                ]}
+              />
+            </Animated.View>
 
-        {/* Connection Status Section */}
-        {isConnected && connectedDevice && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Connection Status</Text>
-            <View style={styles.connectionInfo}>
-              <Text style={styles.connectionLabel}>Connected Device:</Text>
-              <Text style={styles.connectionValue}>
-                {connectedDevice.name || `Device ${connectedDevice.id.slice(-6)}`}
-              </Text>
-              <Text style={styles.connectionLabel}>Device ID:</Text>
-              <Text style={styles.connectionValue}>{connectedDevice.id}</Text>
-            </View>
-            <TouchableOpacity
-              style={styles.disconnectButton}
-              onPress={disconnectDevice}
-            >
-              <Text style={styles.disconnectButtonText}>Disconnect</Text>
+            {!isConnected && !targetDevice && !isSearching ? (
+              // Initial state - Search
+              <>
+                <Text style={[
+                  styles.title,
+                  { fontSize: isSmallScreen ? 28 : 32 }
+                ]}>Connect</Text>
+                <Text style={[
+                  styles.subtitle,
+                  { 
+                    fontSize: isSmallScreen ? 16 : 18,
+                    marginBottom: isSmallScreen ? 40 : 60
+                  }
+                ]}>to your cycling device nearby</Text>
+                
+                <TouchableOpacity style={[
+                  styles.actionButton,
+                  { 
+                    paddingHorizontal: isSmallScreen ? 30 : 40,
+                    paddingVertical: isSmallScreen ? 14 : 18,
+                    minWidth: isSmallScreen ? 160 : 200
+                  }
+                ]} onPress={handleTurnOn}>
+                  <Text style={[
+                    styles.actionButtonText,
+                    { fontSize: isSmallScreen ? 16 : 18 }
+                  ]}>Search</Text>
+                </TouchableOpacity>
+              </>
+            ) : isSearching || isScanning ? (
+              // Searching state
+              <>
+                <Text style={[
+                  styles.title,
+                  { fontSize: isSmallScreen ? 28 : 32 }
+                ]}>Searching...</Text>
+                <Text style={[
+                  styles.subtitle,
+                  { 
+                    fontSize: isSmallScreen ? 16 : 18,
+                    marginBottom: isSmallScreen ? 40 : 60
+                  }
+                ]}>Looking for your cycling device</Text>
+                
+                <TouchableOpacity style={[
+                  styles.cancelButton,
+                  { 
+                    paddingHorizontal: isSmallScreen ? 30 : 40,
+                    paddingVertical: isSmallScreen ? 14 : 18,
+                    minWidth: isSmallScreen ? 160 : 200
+                  }
+                ]} onPress={handleTurnOff}>
+                  <Text style={[
+                    styles.cancelButtonText,
+                    { fontSize: isSmallScreen ? 16 : 18 }
+                  ]}>Cancel</Text>
             </TouchableOpacity>
-          </View>
+          </>
+        ) : targetDevice && !isConnected ? (
+          // Target device found but not connected
+          <>
+            {/* Bike Icon */}
+            <View style={styles.bikeIconContainer}>
+              <Image 
+                source={require('../../assets/icons/bike.png')} 
+                    style={[
+                      styles.bikeIcon,
+                      { 
+                        width: isSmallScreen ? 50 : 60, 
+                        height: isSmallScreen ? 50 : 60 
+                      }
+                    ]}
+                  />
+                  <Text style={[
+                    styles.deviceMacText,
+                    { fontSize: isSmallScreen ? 12 : 14 }
+                  ]}>{TARGET_DEVICE_MAC}</Text>
+            </View>
+            
+                <Text style={[
+                  styles.title,
+                  { fontSize: isSmallScreen ? 28 : 32 }
+                ]}>Device Found</Text>
+                <Text style={[
+                  styles.subtitle,
+                  { 
+                    fontSize: isSmallScreen ? 16 : 18,
+                    marginBottom: isSmallScreen ? 40 : 60
+                  }
+                ]}>Your cycling device is ready to connect</Text>
+                
+                <TouchableOpacity style={[
+                  styles.actionButton,
+                  { 
+                    paddingHorizontal: isSmallScreen ? 30 : 40,
+                    paddingVertical: isSmallScreen ? 14 : 18,
+                    minWidth: isSmallScreen ? 160 : 200
+                  }
+                ]} onPress={handleConnectTarget}>
+                  <Text style={[
+                    styles.actionButtonText,
+                    { fontSize: isSmallScreen ? 16 : 18 }
+                  ]}>Connect</Text>
+            </TouchableOpacity>
+          </>
+        ) : isConnected && connectedDevice ? (
+          // Connected state
+          <>
+            {/* Bike Icon */}
+            <View style={styles.bikeIconContainer}>
+              <Image 
+                source={require('../../assets/icons/bike.png')} 
+                    style={[
+                      styles.bikeIcon,
+                      { 
+                        width: isSmallScreen ? 50 : 60, 
+                        height: isSmallScreen ? 50 : 60 
+                      }
+                    ]}
+                  />
+                  <Text style={[
+                    styles.deviceMacText,
+                    { fontSize: isSmallScreen ? 12 : 14 }
+                  ]}>{connectedDevice.id}</Text>
+            </View>
+            
+                <Text style={[
+                  styles.title,
+                  { fontSize: isSmallScreen ? 28 : 32 }
+                ]}>Connected</Text>
+                <Text style={[
+                  styles.subtitle,
+                  { 
+                    fontSize: isSmallScreen ? 16 : 18,
+                    marginBottom: isSmallScreen ? 40 : 60
+                  }
+                ]}>Your cycling device is ready to use</Text>
+                
+                <TouchableOpacity style={[
+                  styles.disconnectButton,
+                  { 
+                    paddingHorizontal: isSmallScreen ? 30 : 40,
+                    paddingVertical: isSmallScreen ? 14 : 18,
+                    minWidth: isSmallScreen ? 160 : 200
+                  }
+                ]} onPress={handleDisconnectTarget}>
+                  <Text style={[
+                    styles.disconnectButtonText,
+                    { fontSize: isSmallScreen ? 16 : 18 }
+                  ]}>Disconnect</Text>
+            </TouchableOpacity>
+          </>
+        ) : (
+          // Fallback state
+          <>
+                <Text style={[
+                  styles.title,
+                  { fontSize: isSmallScreen ? 28 : 32 }
+                ]}>Bluetooth</Text>
+                <Text style={[
+                  styles.subtitle,
+                  { 
+                    fontSize: isSmallScreen ? 16 : 18,
+                    marginBottom: isSmallScreen ? 40 : 60
+                  }
+                ]}>Manage your device connection</Text>
+                
+                <TouchableOpacity style={[
+                  styles.actionButton,
+                  { 
+                    paddingHorizontal: isSmallScreen ? 30 : 40,
+                    paddingVertical: isSmallScreen ? 14 : 18,
+                    minWidth: isSmallScreen ? 160 : 200
+                  }
+                ]} onPress={handleTurnOn}>
+                  <Text style={[
+                    styles.actionButtonText,
+                    { fontSize: isSmallScreen ? 16 : 18 }
+                  ]}>Search</Text>
+            </TouchableOpacity>
+              </>
+            )}
+          </>
         )}
-      </ScrollView>
+      </View>
     </SafeAreaView>
   );
 };
@@ -322,387 +597,202 @@ const BLEScreen: React.FC = () => {
 
 const styles = StyleSheet.create({
   /**
-   * Main container with white background
+   * Main container - white background matching app theme
    */
   container: {
     flex: 1,
     backgroundColor: '#FFFFFF',
   },
-  
+
   /**
-   * Scroll view container
+   * Content container
    */
-  scrollView: {
+  content: {
     flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 40,
   },
-  
+
   /**
-   * Header section with title and status
+   * Bluetooth icon container - green theme
    */
-  header: {
-    backgroundColor: '#E8F5E8',
-    paddingHorizontal: 20,
-    paddingVertical: 20,
-    marginBottom: 10,
-  },
-  
-  /**
-   * Header title text
-   */
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#333333',
-    marginBottom: 5,
-  },
-  
-  /**
-   * Header subtitle text
-   */
-  headerSubtitle: {
-    fontSize: 16,
-    color: '#666666',
-  },
-  
-  /**
-   * Section container
-   * Light green background with shadow and rounded corners
-   */
-  section: {
-    backgroundColor: '#E8F5E8',
-    paddingHorizontal: 20,
-    paddingVertical: 20,
-    marginHorizontal: 20,
-    marginVertical: 10,
-    borderRadius: 15,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  
-  /**
-   * Section title text
-   */
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333333',
-    marginBottom: 15,
-  },
-  
-  /**
-   * Section description text
-   */
-  sectionDescription: {
-    fontSize: 14,
-    color: '#666666',
-    marginBottom: 15,
-    lineHeight: 20,
-  },
-  
-  /**
-   * Permission button
-   * Green button for requesting permissions
-   */
-  permissionButton: {
+  bluetoothIconContainer: {
+    width: 80,
+    height: 80,
     backgroundColor: '#20A446',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 8,
+    borderRadius: 40,
     alignItems: 'center',
-  },
-  
-  /**
-   * Permission button text
-   */
-  permissionButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  
-  /**
-   * Scan button
-   * Green button for starting/stopping device scan
-   */
-  scanButton: {
-    backgroundColor: '#20A446',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  
-  /**
-   * Scanning button state
-   * Different color when actively scanning
-   */
-  scanningButton: {
-    backgroundColor: '#FF9500',
-  },
-  
-  /**
-   * Scan button text
-   */
-  scanButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  
-  /**
-   * Cycling data summary container
-   */
-  cyclingDataSummary: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 20,
-  },
-  
-  /**
-   * Individual data card
-   * White background with shadow and rounded corners
-   */
-  dataCard: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-    padding: 15,
-    borderRadius: 12,
-    alignItems: 'center',
-    marginHorizontal: 5,
+    justifyContent: 'center',
+    marginBottom: 40,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 4,
   },
-  
+
   /**
-   * Data label text
+   * Bluetooth icon
    */
-  dataLabel: {
-    fontSize: 12,
-    color: '#666666',
-    marginBottom: 5,
+  bluetoothIcon: {
+    width: 40,
+    height: 40,
+    tintColor: '#FFFFFF',
   },
-  
+
   /**
-   * Data value text (large)
+   * Bike icon container
    */
-  dataValue: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#333333',
-    marginBottom: 2,
-  },
-  
-  /**
-   * Data unit text
-   */
-  dataUnit: {
-    fontSize: 12,
-    color: '#666666',
-  },
-  
-  /**
-   * Subsection title text
-   */
-  subsectionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333333',
-    marginBottom: 10,
-  },
-  
-  /**
-   * List container
-   */
-  list: {
-    marginTop: 10,
-  },
-  
-  /**
-   * No devices text
-   */
-  noDevicesText: {
-    fontSize: 14,
-    color: '#666666',
-    textAlign: 'center',
-    fontStyle: 'italic',
-  },
-  
-  /**
-   * Device item container
-   * White background with shadow and rounded corners
-   */
-  deviceItem: {
-    backgroundColor: '#FFFFFF',
-    padding: 15,
-    borderRadius: 12,
-    marginBottom: 10,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  bikeIconContainer: {
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 3,
+    marginBottom: 40,
   },
-  
+
   /**
-   * Device information container
+   * Bike icon
    */
-  deviceInfo: {
-    flex: 1,
+  bikeIcon: {
+    width: 60,
+    height: 60,
+    tintColor: '#20A446',
+    marginBottom: 12,
   },
-  
+
   /**
-   * Device name text
+   * Device MAC address text
    */
-  deviceName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333333',
-    marginBottom: 4,
-  },
-  
-  /**
-   * Device ID text
-   */
-  deviceId: {
-    fontSize: 12,
-    color: '#666666',
-    marginBottom: 2,
-  },
-  
-  /**
-   * Device RSSI text
-   */
-  deviceRssi: {
-    fontSize: 12,
-    color: '#666666',
-  },
-  
-  /**
-   * Connect button
-   * Green button for connecting to devices
-   */
-  connectButton: {
-    backgroundColor: '#20A446',
-    paddingHorizontal: 15,
-    paddingVertical: 8,
-    borderRadius: 6,
-  },
-  
-  /**
-   * Disconnect button
-   * Red button for disconnecting from devices
-   */
-  disconnectButton: {
-    backgroundColor: '#FF3B30',
-  },
-  
-  /**
-   * Connect button text
-   */
-  connectButtonText: {
-    color: '#FFFFFF',
+  deviceMacText: {
     fontSize: 14,
-    fontWeight: '600',
-  },
-  
-  /**
-   * Characteristic item container
-   * Light green background with rounded corners
-   */
-  characteristicItem: {
-    backgroundColor: '#D0E8D0',
-    padding: 15,
-    borderRadius: 12,
-    marginBottom: 10,
-  },
-  
-  /**
-   * Characteristic information container
-   */
-  characteristicInfo: {
-    gap: 5,
-  },
-  
-  /**
-   * Characteristic label text
-   */
-  characteristicLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333333',
-  },
-  
-  /**
-   * Characteristic UUID text
-   */
-  characteristicUuid: {
-    fontSize: 12,
     color: '#666666',
     fontFamily: 'monospace',
   },
-  
+
   /**
-   * Characteristic value text
+   * Title text - app green theme
    */
-  characteristicValue: {
-    fontSize: 14,
-    color: '#333333',
-    fontWeight: '500',
+  title: {
+    fontSize: 32,
+    fontFamily: 'Lexend-Bold',
+    color: '#20A446',
+    textAlign: 'center',
+    marginBottom: 12,
   },
-  
+
   /**
-   * Characteristic time text
+   * Subtitle text
    */
-  characteristicTime: {
-    fontSize: 12,
+  subtitle: {
+    fontSize: 18,
     color: '#666666',
+    textAlign: 'center',
+    marginBottom: 60,
+    lineHeight: 24,
   },
-  
+
   /**
-   * Connection information container
+   * Action button - app green theme
    */
-  connectionInfo: {
-    backgroundColor: '#FFFFFF',
-    padding: 15,
+  actionButton: {
+    backgroundColor: '#20A446',
+    paddingHorizontal: 40,
+    paddingVertical: 18,
     borderRadius: 12,
-    marginBottom: 15,
+    minWidth: 200,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 4,
   },
-  
+
   /**
-   * Connection label text
+   * Action button text
    */
-  connectionLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#333333',
-    marginBottom: 5,
+  actionButtonText: {
+    fontSize: 18,
+    fontFamily: 'Lexend-Bold',
+    color: '#FFFFFF',
   },
-  
+
   /**
-   * Connection value text
+   * Cancel button - secondary style
    */
-  connectionValue: {
-    fontSize: 14,
-    color: '#666666',
-    marginBottom: 10,
+  cancelButton: {
+    backgroundColor: 'transparent',
+    borderWidth: 2,
+    borderColor: '#20A446',
+    paddingHorizontal: 40,
+    paddingVertical: 18,
+    borderRadius: 12,
+    minWidth: 200,
+    alignItems: 'center',
   },
-  
+
+  /**
+   * Cancel button text
+   */
+  cancelButtonText: {
+    fontSize: 18,
+    fontFamily: 'Lexend-Bold',
+    color: '#20A446',
+  },
+
+  /**
+   * Disconnect button - red theme
+   */
+  disconnectButton: {
+    backgroundColor: '#FF3B30',
+    paddingHorizontal: 40,
+    paddingVertical: 18,
+    borderRadius: 12,
+    minWidth: 200,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+
   /**
    * Disconnect button text
    */
   disconnectButtonText: {
+    fontSize: 18,
+    fontFamily: 'Lexend-Bold',
     color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
+  },
+
+  /**
+   * Landscape content container - side by side layout
+   */
+  landscapeContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-around',
+    paddingHorizontal: 20,
+  },
+
+  /**
+   * Landscape left side - icons and status
+   */
+  landscapeLeft: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingRight: 20,
+  },
+
+  /**
+   * Landscape right side - text and buttons
+   */
+  landscapeRight: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingLeft: 20,
   },
 });
 
